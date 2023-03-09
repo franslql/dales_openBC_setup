@@ -1,8 +1,7 @@
 # coarse
-Coarse simulation
 
 ## input
-Input for coarse simulation
+Input for coarse simulation.
 
 ## output
-Output for coarse simulation
+Output for coarse simulation.
