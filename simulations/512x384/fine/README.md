@@ -1,8 +1,7 @@
 # fine
-High resolution simulation
 
 ## input
-Input for high resolution
+Input for high resolution simulation.
 
 ## output
-Output for high resolution
+Output of high resolution simulation.
