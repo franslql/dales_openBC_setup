@@ -4,4 +4,4 @@
 Input for coarse simulation.
 
 ## output
-Output for coarse simulation.
+Output of coarse simulation.
