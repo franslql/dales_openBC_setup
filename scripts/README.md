@@ -15,5 +15,8 @@ Advective interpolation scheme to artificially increase the temporal resolution 
 ## funcDALES.py
 Some usefull functions used in multiple scripts.
 
+## merge.sh
+Merges DALES output files.
+
 ## H43_65lev.txt
 Text file required to obtain the pressure levels of HARMONIE.
