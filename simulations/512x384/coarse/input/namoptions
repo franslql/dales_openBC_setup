@@ -1,0 +1,206 @@
+&RUN
+
+iexpnr     = 000
+lwarmstart = .false.
+startfile  = 'warmstartfile'
+runtime    = 43200
+trestart   = 10800
+ladaptive  = .true.
+irandom    =  43
+randthl    =  0.1
+randqt     =  2.5e-5
+nsv        =  2
+dtav_glob  = 60.
+timeav_glob= 60.
+courant    = 0.8     ! slightly reduced adaptive time step length
+peclet     = 0.1     !
+nprocx     = 16
+nprocy     = 16
+/
+
+&DOMAIN
+itot       =  512
+jtot       =  384
+kmax       =  150
+
+xsize      =  320000.
+ysize      =  240000.
+
+xlat   = 13.289436
+xlon   = -57.807102
+xday   = 36
+xtime  = 0
+/
+
+&PHYSICS
+z0         =  1e-5
+ps         =  101749.265625
+thls       =  297.83690249309893
+lmoist     =  .true.
+lcoriol    =  .true.
+ltimedep   =  .false.
+ltimedepuv =  .false.
+ltimedepsv =  .false.
+irad       =  -1
+iradiation =  4
+timerad    =  60
+useMcICA   = .false.
+rad_ls     = .false.
+igrw_damp  =  0
+/
+
+&NAMRADIATION
+usero3     = .false.
+ocean      = .true.
+iyear      = 2020
+lCnstAlbedo = .true.  ! added - note if absent, albedo is solar-angle dependent but that code is broken
+/
+
+&NAMCLOUDFIELD
+lcloudfield =  .false.
+/
+
+&NAMMICROPHYSICS
+imicro     =  2
+l_sb       =  .false.
+l_rain     =  .true.
+l_sedc     =  .true.
+l_mur_cst  =  .false.
+mur_cst    =  0
+Nc_0       =  50e6
+sig_g      = 1.2
+/
+
+&NAMNUDGE
+lnudge	  = .false. ! changed
+tnudgefac = 1
+/
+
+&NAMSURFACE
+isurf      =   2
+lsmoothflux= .false.
+ustin      =   0.3
+albedoav   =  0.07
+!lhetero_sfc_temp = .false.
+/
+
+&DYNAMICS
+llsadv     =  .false.
+lqlnr      =  .false.
+cu         =  0.
+cv         =  0.
+
+iadv_mom    =  2  ! Was 5
+iadv_tke    =  2
+iadv_thl    =  2
+iadv_qt     =  2
+iadv_sv     =  2
+/
+
+&NAMSUBGRID
+ldelta      = .true.
+sgs_surface_fix = .false. ! Fix for large surface tke
+lanisotrop  = .false. ! Stephan's anisotropic subgrid scheme
+lmason = .true.
+nmason = 1.
+/
+
+&NAMBUDGET
+lbudget     = .true.
+dtav        = 60.
+/
+
+&NAMNETCDFSTATS
+lnetcdf     = .true.
+lsync       = .true. ! was true (now again set to false for real sim)
+/
+
+&NAMCHECKSIM
+tcheck      = 0
+/
+
+&NAMSAMPLING
+lsampcl     = .false.  ! turned all off for OpenBC
+lsampco     = .false.
+lsampup     = .false.
+lsampbuup   = .false.
+lsamptend   = .false.
+/
+
+&NAMTIMESTAT
+ltimestat   = .true.
+/
+
+&NAMFIELDDUMP
+lfielddump  = .true.
+ldiracc     = .true.
+dtav        = 1800 ! Set to 1800 for real sim
+/
+
+&NAMSTATTEND
+ltend       = .true.
+/
+
+&NAMGENSTAT
+lstat       = .true.
+/
+
+&NAMBULKMICROSTAT
+lmicrostat  = .true.
+/
+
+&NAMCROSSSECTION
+lcross     = .true.
+dtav       = 30
+crossheight = 1,6,20,60,150
+crossortho = 130,194,258
+crossplane = 98,146,194
+/
+
+&NAMCAPE
+lcape      = .true.
+dtav       = 60
+/
+
+&NAMRADSTAT
+lstat        = .true.
+lradclearair = .false.
+dtav   = 60
+timeav = 60
+/
+
+
+! solver settings that worked well on Ruisdael case over NL
+&SOLVER
+solver_id = 100    ! 6=LGMRES working after anchoring
+precond_id = 1   ! 0 - SMG, 1 - PFMG (faster)
+n_pre = 1
+n_post = 1
+maxiter_precond = 1
+tolerance = 1e-4
+maxiter   = 50
+hypre_logging = 1
+/
+
+&OPENBC
+lopenbc = .true.
+linithetero = .true.
+lper = f,f
+dxint = 2500
+dyint = 2500
+dzint = 99999.
+dxturb = 320000
+dyturb = 240000
+lbuoytop = .false.
+taum  = 0.
+tauh = 20.
+pbc   = 3
+lsynturb = .true.
+iturb    = 1
+lambda = 1875.
+lambdas_x = 1875.
+lambdas_y = 1875.
+lambdas_z = 240.
+tau = 180.
+nmodes = 100.
+/
