@@ -16,10 +16,6 @@ if 'coarse' in input:
   #%% Create DALES grid
   grid = GridDales(input_coarse)
   #%% Transfor input data to rectilinear grid and to prognostic variables of DALES
-  import importlib
-  import prep_harmonie
-  importlib.reload(prep_harmonie)
-  from prep_harmonie import prep_harmonie
   if(input_coarse['source'].lower() == 'harmonie'): 
     data,transform = prep_harmonie(input_coarse,grid)
   else:
@@ -34,10 +30,6 @@ if 'coarse' in input:
   #%% Create boundary input > openboundaries.inp.xxx.nc
   openboundaries = boundary_fields(input_coarse,grid,data)
   #%% Create synthetic turbulence for boundary input (optional) > openboundaries.inp.xxx.nc
-  import importlib
-  import synthetic_turbulence
-  importlib.reload(synthetic_turbulence)
-  from synthetic_turbulence import synthetic_turbulence
   if(input_coarse['lsynturb']): 
     synturb = synthetic_turbulence(input_coarse,grid,data,transform)
   #%% Create heterogeneous and time dependend skin temperature > tskin.inp.xxx.nc (if ltskin==true)
