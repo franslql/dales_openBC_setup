@@ -3,16 +3,16 @@
 import numpy as np
 import xarray as xr
 from datetime import datetime
-import pandas as pd 
+import pandas as pd
 def initial_fields(input,grid,data,transform):
   time0 = pd.to_datetime(str(data['time'][0].values)).strftime('%Y-%m-%d %H:%M:%S')
   data = data.isel({'time': 0},drop=True).drop(['lat','lon']).chunk({'z':1})
   # Interpolate data to DALES staggered grid
-  u0   = data['u'].interp({'z': grid.zt, 'y': grid.yt, 'x': grid.xm}).rename({'z': 'zt', 'y': 'yt', "x": 'xm'}).rename('u0')
-  v0   = data['v'].interp({'z': grid.zt, 'y': grid.ym, 'x': grid.xt}).rename({'z': 'zt', 'y': 'ym', "x": 'xt'}).rename('v0')
-  w0   = data['w'].interp({'z': grid.zm, 'y': grid.yt, 'x': grid.xt}).rename({'z': 'zm', 'y': 'yt', "x": 'xt'}).rename('w0')
-  thl0 = data['thl'].interp({'z': grid.zt, 'y': grid.yt, 'x': grid.xt}).rename({'z': 'zt', 'y': 'yt', "x": 'xt'}).rename('thl0')
-  qt0  = data['qt'].interp({'z': grid.zt, 'y': grid.yt, 'x': grid.xt}).rename({'z': 'zt', 'y': 'yt', "x": 'xt'}).rename('qt0')
+  u0   = data['u'].interp(z=grid.zt, y=grid.yt, x=grid.xm, assume_sorted=True).rename({'z': 'zt', 'y': 'yt', "x": 'xm'}).rename('u0')
+  v0   = data['v'].interp(z=grid.zt, y=grid.ym, x=grid.xt, assume_sorted=True).rename({'z': 'zt', 'y': 'ym', "x": 'xt'}).rename('v0')
+  w0   = data['w'].interp(z=grid.zm, y=grid.yt, x=grid.xt, assume_sorted=True).rename({'z': 'zm', 'y': 'yt', "x": 'xt'}).rename('w0')
+  thl0 = data['thl'].interp(z=grid.zt, y=grid.yt, x=grid.xt, assume_sorted=True).rename({'z': 'zt', 'y': 'yt', "x": 'xt'}).rename('thl0')
+  qt0  = data['qt'].interp(z=grid.zt, y=grid.yt, x=grid.xt, assume_sorted=True).rename({'z': 'zt', 'y': 'yt', "x": 'xt'}).rename('qt0')
   e120 = (xr.ones_like(thl0)*input['e12']).rename('e120')
   u0.attrs.clear(); v0.attrs.clear(); w0.attrs.clear(); thl0.attrs.clear() ;qt0.attrs.clear()
   # Calculate lat lon for cell centers
