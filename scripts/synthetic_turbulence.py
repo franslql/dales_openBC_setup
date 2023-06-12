@@ -8,15 +8,15 @@ def synthetic_turbulence(input,grid,data,transform):
   T0 = 293
   zi = np.maximum(data['zi'],zi_min)
   # Get velocity variances from TKE assuming isotropic turbulence
-  tke_prof = data['tke'].mean(dim=['x','y']).interp({'z': grid.zt}).rename({'z': 'zt'})
+  tke_prof = data['tke'].sel(x=slice(0,grid.xsize),y=slice(0,grid.ysize)).mean(dim=['x','y']).interp(z=grid.zt, assume_sorted=True).rename({'z': 'zt'})
   e  = 2/3*tke_prof
   u2 = e.rename('u2').expand_dims(dim={'ypatch': [grid.ysize/2], 'xpatch': [grid.xsize/2]},axis=[2,3])
   v2 = e.rename('v2').expand_dims(dim={'ypatch': [grid.ysize/2], 'xpatch': [grid.xsize/2]},axis=[2,3])
   w2 = e.rename('w2').expand_dims(dim={'ypatch': [grid.ysize/2], 'xpatch': [grid.xsize/2]},axis=[2,3])
   # Get uw and vw from ustar and vstar assuming linear profile in BL
   mask = (u2.coords['zt']<=zi)
-  ustar = data['ustar'].mean(dim=['x','y'])
-  vstar = data['vstar'].mean(dim=['x','y'])
+  ustar = data['ustar'].sel(x=slice(0,grid.xsize),y=slice(0,grid.ysize)).mean(dim=['x','y'])
+  vstar = data['vstar'].sel(x=slice(0,grid.xsize),y=slice(0,grid.ysize)).mean(dim=['x','y'])
   uw = xr.where(mask,ustar*(1-u2.coords['zt']/zi),0.).rename('uw')\
     .transpose('time','zt')\
     .expand_dims(dim={'ypatch': [grid.ysize/2], 'xpatch': [grid.xsize/2]},axis=[2,3])\
@@ -34,7 +34,7 @@ def synthetic_turbulence(input,grid,data,transform):
     .transpose('time','zt','ypatch','xpatch')
   uv     = xr.where(np.isnan(uv),0.,uv)
   # Get wthls
-  wthls = data['wthls'].mean(dim=['x','y'])
+  wthls = data['wthls'].sel(x=slice(0,grid.xsize),y=slice(0,grid.ysize)).mean(dim=['x','y'])
   wthl  = xr.where(mask,wthls*(1-1.2*u2.coords['zt']/zi),0.).rename('wthl')\
     .transpose('time','zt')\
     .expand_dims(dim={'ypatch': [grid.ysize/2], 'xpatch': [grid.xsize/2]},axis=[2,3])\
