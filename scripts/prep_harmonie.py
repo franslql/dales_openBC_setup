@@ -17,36 +17,37 @@ grav = 9.81         # Gravitational constant
 kappa= 0.4          # Von Karman constant
 def prep_harmonie(input,grid):
   variables = ['ua','va','wa','ta','hus','clw','ps','tas','huss']
-  if(input['lsynturb']): variables = variables+['tke','tauu','tauv','cb','hfss']
+  if('synturb' in input): variables = variables+['tke','tauu','tauv','cb','hfss']
   data = []
   # Open data and crop data
   for var in variables:
     with xr.open_mfdataset(f"{input['inpath']}{var}_*.nc",chunks={"time": input['tchunk']}) as ds:
-      # Read transform information and transform lat/lon of southwest corner to harmonie x/y
-      transform = Transform(ds['Lambert_Conformal'].attrs)
-      x_sw,y_sw = transform.latlon_to_xy(input['lat_sw'],input['lon_sw'])
-      # Round to meter to avoid numerical error in coordinates
-      x_sw = np.round(x_sw,0) 
-      y_sw = np.round(y_sw,0) 
-      # Crop data to time and spatial range, using harmonie spatial resolution as buffer
-      dx = ds['x'][1]-ds['x'][0]
-      dy = ds['y'][1]-ds['y'][0]
-      # MISTAKE IN TIME TAUU, TAUV & HFSS HARDCODE CORRECT REMOVE WHEN FIXED
-      if(var=='ua'): time_correct = ds.coords['time'].values
-      if(var=='tauu' or var=='tauv' or 'hfss'): 
-         ds=ds.assign_coords(time=time_correct)
+      # Get time epochs
+      if(var==variables[0]):
+        # Read transform information and transform lat/lon of southwest corner to harmonie x/y
+        transform = Transform(ds['Lambert_Conformal'].attrs)
+        x_sw,y_sw = transform.latlon_to_xy(input['lat_sw'],input['lon_sw'])
+        # Round to 5 meters to avoid numerical error in coordinates
+        x_sw = np.round(x_sw,0)
+        y_sw = np.round(y_sw,0)
+        time = ds['time'].values
+      # Interpolate fluxes to same time
+      if(var in ['tauu','tauv','hfss']):
+        ds = ds.interp(time=time,assume_sorted=True,kwargs={'fill_value': 'extrapolate'}).chunk({'time':input['tchunk']})
+      # Crop data to time and spatial range, using harmonie spatial resolution or filter as buffer
+      dx = ds['x'][1].values-ds['x'][0].values
+      dy = ds['y'][1].values-ds['y'][0].values
+      if('filter' in input): # add some extra width for gaussian filtering
+        buffer = 4*input['filter']['sigma']
+      else:
+        buffer = dx   
       data.append(ds[var].sel(time=slice(input['start'], input['end']),
-                              x=slice(x_sw-dx,x_sw+grid.xsize+dx),
-                              y=slice(y_sw-dy,y_sw+grid.ysize+dy)).load())
+                              x=slice(x_sw-buffer,x_sw+grid.xsize+buffer),
+                              y=slice(y_sw-buffer,y_sw+grid.ysize+buffer)))
     # Set south west corner of DALES as origin
     data[-1] = data[-1].assign_coords({'x': data[-1]['x'].values-x_sw, 'y': data[-1]['y'].values-y_sw})
   # Merge into xarray dataset
-  data = xr.merge(data)
-  # MISTAKE IN TIME TAUU, TAUV & HFSS HARDCODE CORRECT REMOVE WHEN FIXED
-  if(input['lsynturb']):
-    for var in ['tauu','tauv','hfss']:
-      data[var].load()
-      data[var][{'time': 0}]=data[var][{'time': 1}]
+  data = xr.merge(data,compat='override')
   # Change transform parameters to new DALES origin and update transform
   transform.parameters['false_easting'] = transform.parameters['false_easting']-x_sw
   transform.parameters['false_northing']= transform.parameters['false_northing']-y_sw
@@ -66,25 +67,17 @@ def prep_harmonie(input,grid):
   p = 0.5*(ph.assign_coords({'lev': ph['lev'].values-1})+ph)
   data = data.assign({'p': p})
   # Add missing surface fields to 3d fields
-  data = xr.merge([data,xr.Dataset({'uas' : (['time','y','x'],xr.zeros_like(data['ps'])), 
-                                    'vas' : (['time','y','x'],xr.zeros_like(data['ps'])), 
-                                    'was' : (['time','y','x'],xr.zeros_like(data['ps'])), 
-                                    'clws': (['time','y','x'],xr.zeros_like(data['ps']))},
-                                    coords = {'time': data['time'],
-                                              'y': data['y'],
-                                              'x': data['x']})])
-  if(input['lsynturb']): 
-     data = xr.merge([data,xr.Dataset({'tkes' : (['time','y','x'],xr.zeros_like(data['ps']))},
-                                       coords = {'time': data['time'],
-                                                 'y': data['y'],
-                                                 'x': data['x']})])
-     tauu = data['tauu']
-     tauv = data['tauv']
-     hfss = data['hfss']
-     cb   = data['cb']
+  variables = ['uas','vas','was','clws']
+  if('synturb' in input): variables.append('tkes')
+  data = data.assign({var:xr.zeros_like(data['ps']) for var in variables})
+  if('synturb' in input):
+    tauu = data['tauu']
+    tauv = data['tauv']
+    hfss = data['hfss']
+    cb   = data['cb']
   # Concatenate surface and 3D fields
   variables = ['ua','va','wa','ta','hus','clw','p']
-  if(input['lsynturb']): variables.append('tke')
+  if('synturb' in input): variables.append('tke')
   data = xr.merge(
     [xr.concat([data[var].assign_coords({'lev': data['lev']}),data[var+'s']
                 .expand_dims({'lev':[data.sizes['lev']+1]},axis=1)],dim='lev')
@@ -98,7 +91,7 @@ def prep_harmonie(input,grid):
     z = [z[0]-(data['p'].isel(lev=k,drop=True)-data['p'].isel(lev=k+1,drop=True))/(rhoh.isel(lev=k,drop=True)*grav)] + z
   data = data.assign({'z3d': xr.concat(z,dim='lev').chunk({'lev': data.sizes['lev']+1}).transpose('time','lev','y','x')})
   # Get reference height levels (mean of height field first time step) and crop to grid.zsize
-  z_int = data['z3d'].isel({'time':0},drop=True).mean(dim=['x','y'])[::-1].values
+  z_int = data['z3d'].isel({'time':0},drop=True).sel(x=slice(0,grid.xsize),y=slice(0,grid.ysize)).mean(dim=['x','y'])[::-1].values
   z_int = z_int[:np.argwhere(z_int>grid.zsize)[0][0]+1]
   # Interpolate data to reference height levels
   data_intz = []
@@ -110,7 +103,7 @@ def prep_harmonie(input,grid):
                 'x': data.coords['x']}
   new_dims = ['time','z','y','x']
   variables = ['ua','va','wa','ta','p','hus','clw']
-  if(input['lsynturb']): variables.append('tke')
+  if('synturb' in input): variables.append('tke')
   for var in variables:
     its = 0
     var_intz = []
@@ -134,14 +127,14 @@ def prep_harmonie(input,grid):
   # Calculate qt
   data = data.assign({'qt': data['clw']+data['hus']})
   # Calculate base profiles and exnr function
-  tas_exnr = data['ta'].isel({'time': 0, 'z': 0},drop=True).mean(dim=['x','y']).values
-  ps_exnr  = data['p'].isel({'time': 0, 'z': 0},drop=True).mean(dim=['x','y']).values
+  tas_exnr = data['ta'].isel({'time': 0, 'z': 0},drop=True).sel(x=slice(0,grid.xsize),y=slice(0,grid.ysize)).mean(dim=['x','y']).values
+  ps_exnr  = data['p'].isel({'time': 0, 'z': 0},drop=True).sel(x=slice(0,grid.xsize),y=slice(0,grid.ysize)).mean(dim=['x','y']).values
   exnrs    = (ps_exnr/p0)**(Rd/cp)
   thls_exnr= tas_exnr/exnrs
   rhobf    = calcBaseprof(z_int,thls_exnr,ps_exnr,pref0=p0)
-  p_exnr   = rhobf[1:]*Rd*data['ta'][0,1:].mean(dim=['x','y']).values*\
-           ( 1+(Rv/Rd-1)*data['qt'][0,1:].mean(dim=['x','y']).values-\
-             Rv/Rd*data['clw'][0,1:].mean(dim=['x','y']).values ) # Ideal gas law
+  p_exnr   = rhobf[1:]*Rd*data['ta'][0,1:].sel(x=slice(0,grid.xsize),y=slice(0,grid.ysize)).mean(dim=['x','y']).values*\
+           ( 1+(Rv/Rd-1)*data['qt'][0,1:].sel(x=slice(0,grid.xsize),y=slice(0,grid.ysize)).mean(dim=['x','y']).values-\
+             Rv/Rd*data['clw'][0,1:].sel(x=slice(0,grid.xsize),y=slice(0,grid.ysize)).mean(dim=['x','y']).values ) # Ideal gas law
   exnr     = (p_exnr/p0)**(Rd/cp)
   exnr     = xr.DataArray(np.concatenate([exnrs[None],exnr]),
                           dims = ['z'],
@@ -153,12 +146,12 @@ def prep_harmonie(input,grid):
   thl      = data['ta']/exnr-Lv*data['clw']/(cp*exnr)
   data     = data.assign({'thl': thl})
   # Calculate turbulence parameters
-  if(input['lsynturb']):
+  if('synturb' in input):
     # Calculate inversion height from maximum curvature and with cloud base as a backup
     zi_min= 200
     zi_max= 4000
-    thlmean = thl.mean(dim=['x','y'])
-    cbmean= xr.where(cb>0.,cb,np.NaN).mean(dim=['x','y'])
+    thlmean = thl.sel(x=slice(0,grid.xsize),y=slice(0,grid.ysize)).mean(dim=['x','y'])
+    cbmean= xr.where(cb>0.,cb,np.NaN).sel(x=slice(0,grid.xsize),y=slice(0,grid.ysize)).mean(dim=['x','y'])
     its = 0 
     d2thl = []
     d1thl = []
