@@ -86,17 +86,16 @@ def synthetic_turbulence(input,grid,data,transform):
         .assign_attrs({'longname': long_name+boundary+' boundary', 'units': unit})
   # Adjust time variable to seconds since initial field
   ts = synturb['time'].values.astype('datetime64[s]')
-  dts = (ts-ts[0])/np.timedelta64(1, 's')
+  dts = (ts-np.datetime64(input['time0'],'s'))/np.timedelta64(1, 's')
   synturb = synturb.assign_coords({'time':('time', dts)})
   synturb['time'].attrs.clear()
-  time0 = pd.to_datetime(str(data['time'][0].values)).strftime('%Y-%m-%d %H:%M:%S')
   # Add global attributes
-  synturb['time'] = synturb['time'].assign_attrs({'longname': 'Time', 'units': f"seconds since {time0}"})
+  synturb['time'] = synturb['time'].assign_attrs({'longname': 'Time', 'units': f"seconds since {input['time0']}"})
   synturb['xpatch'] = synturb['xpatch'].assign_attrs({'longname': 'West-East displacement of synthetic turbulence input patches','units': 'm'})
   synturb['ypatch'] = synturb['ypatch'].assign_attrs({'longname': 'South-North displacement of synthetic turbulence input patches','units': 'm'})
   synturb = synturb.assign_attrs({'title': f"openboundaries.inp.{input['iexpnr']:03d}.nc",
                                         'history_synturb': f"Created on {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC",
                                         'author_synturb': input['author'],
-                                        'time0_synturb': time0})
+                                        'time0_synturb': input['time0']})
   synturb.to_netcdf(path=input['outpath']+synturb.attrs['title'], mode='a', format="NETCDF4")
   return synturb
