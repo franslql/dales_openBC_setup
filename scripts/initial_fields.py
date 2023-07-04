@@ -5,7 +5,6 @@ import xarray as xr
 from datetime import datetime
 import pandas as pd
 def initial_fields(input,grid,data,transform):
-  time0 = pd.to_datetime(str(data['time'][0].values)).strftime('%Y-%m-%d %H:%M:%S')
   data = data.isel({'time': 0},drop=True).drop(['lat','lon']).chunk({'z':1})
   # Interpolate data to DALES staggered grid
   u0   = data['u'].interp(z=grid.zt, y=grid.yt, x=grid.xm, assume_sorted=True).rename({'z': 'zt', 'y': 'yt', "x": 'xm'}).rename('u0')
@@ -51,7 +50,36 @@ def initial_fields(input,grid,data,transform):
   initfields = initfields.assign_attrs({'title': f"initfields.inp.{input['iexpnr']:03d}.nc",
                                         'history': f"Created on {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC",
                                         'author': input['author'],
-                                        'time0': time0})
+                                        'time0': input['time0']})
   # Save data
   initfields.to_netcdf(path=input['outpath']+initfields.attrs['title'], mode='w', format="NETCDF4")
   return initfields
+
+def initial_fields_fine(input,grid):
+  # Load data
+  with xr.open_mfdataset(f"{input['inpath_coarse']}initfields.inp.*.nc") as ds:
+    initfields_fine = ds.interp(xt=grid.xt+input['x_offset'],
+                                xm=grid.xm+input['x_offset'],
+                                yt=grid.yt+input['y_offset'],
+                                ym=grid.ym+input['y_offset'],
+                                zt=grid.zt,
+                                zm=grid.zm,
+                                assume_sorted=True)
+    initfields_fine = initfields_fine.assign_coords({'xt': grid.xt, 'xm': grid.xm, 'yt': grid.yt, 'ym': grid.ym})
+    # Adjust transform
+    initfields_fine['transform'].attrs['false_easting'] = initfields_fine['transform'].attrs['false_easting']-input['x_offset']
+    initfields_fine['transform'].attrs['false_northing'] = initfields_fine['transform'].attrs['false_northing']-input['y_offset']
+    proj4 = ''
+    for param in initfields_fine['transform'].attrs['proj4'][1:].split('+'):
+      line = '+'+param
+      if 'x_0' in param: line = f"+x_0={initfields_fine['transform'].attrs['false_easting']} "
+      if 'y_0' in param: line = f"+y_0={initfields_fine['transform'].attrs['false_northing']} "
+      proj4 = proj4+line
+    initfields_fine['transform'].attrs['proj4']=proj4.rstrip()
+    # Add global attributes
+    initfields_fine = initfields_fine.assign_attrs({'title': f"initfields.inp.{input['iexpnr']:03d}.nc",
+                                          'history': f"Created on {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC",
+                                          'author': input['author'],
+                                          'time0': input['time0']})
+  initfields_fine.to_netcdf(path=input['outpath']+initfields_fine.attrs['title'], mode='w', format="NETCDF4")
+  return initfields_fine
