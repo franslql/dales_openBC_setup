@@ -60,7 +60,7 @@ def prep_harmonie(input,grid):
   transform.parameters['proj4']=proj4.rstrip()
   transform = Transform(transform.parameters)
   # Calculate pressure levels
-  coeff = np.loadtxt('H43_65lev.txt')
+  coeff = np.loadtxt(f"{input['inpath']}H43_65lev.txt")
   a = xr.DataArray(coeff[:,1],dims=['lev'],coords=[coeff[:,0]])
   b = xr.DataArray(coeff[:,2],dims=['lev'],coords=[coeff[:,0]])
   ph = (a+b*data['ps']).transpose('time','lev','y','x')
@@ -172,6 +172,7 @@ def prep_harmonie(input,grid):
   data = data.rename({'ua': 'u', 'va': 'v', 'wa': 'w'})\
     .drop(['ta','p','clw','hus','height'])\
     .assign({'transform' : xr.DataArray([],name='Lambert_Conformal',attrs=transform.parameters)})
+  #data.to_netcdf(f"{input['outpath']}harmonie.nc")
   return data,transform
 
 class Transform:
