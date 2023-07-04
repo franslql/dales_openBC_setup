@@ -1,0 +1,29 @@
+{ "author": "Frans Liqui Lung",
+  "fine": {
+    "inpath_coarse": "/hpcperm/nmfl/eureca/simulations/2304x1920_nested/coarse/input/002/",
+    "outpath_coarse": "/hpcperm/nmfl/eureca/simulations/2304x1920_nested/coarse/output/002/",
+    "outpath_coarse_old": "/hpcperm/nmfl/eureca/simulations/2304x1920_nested/coarse/output/001/", 
+    "outpath":"/scratch/nmfl/eureca-cases/input_test/002/",
+    "start":"2020-02-05T00:00",
+    "end":  "2020-02-05T02:00",
+    "time0":"2020-02-05T00:00",
+    "nsv": 2,
+    "iexpnr": 2,
+    "x_offset": 160625,
+    "y_offset": 236250,
+    "dx_coarse": 625,
+    "dy_coarse": 625,
+    "tchunk": 1,
+    "grid": {
+      "xsize": 400000,
+      "ysize": 260000,
+      "itot": 2560,
+      "jtot": 1664,
+      "kmax": 150,
+      "dz0": 20,
+      "alpha": 0.012
+    },
+    "tskin": {
+    }
+  }
+}
