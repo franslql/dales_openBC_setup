@@ -172,7 +172,7 @@ def prep_harmonie(input,grid):
   data = data.rename({'ua': 'u', 'va': 'v', 'wa': 'w'})\
     .drop(['ta','p','clw','hus','height'])\
     .assign({'transform' : xr.DataArray([],name='Lambert_Conformal',attrs=transform.parameters)})
-  #data.to_netcdf(f"{input['outpath']}harmonie.nc")
+  #data.to_netcdf(f"{input['outpath']}harmonie.nc", mode='w', format="NETCDF4")
   return data,transform
 
 class Transform:
