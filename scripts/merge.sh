@@ -140,15 +140,15 @@ if [ "${filename:0:4}" = "cape" ]; then
   echo "Merge cape files for experiment ${iexpnr}"
   rm -r cape
   mkdir cape
-  # Find number of processes in y direction
-  nprocy=$(ls cape.x000*y* | wc -l | tr -d ' ')
-  echo "Nprocy" = ${nprocy}
+  # Find number of processes in x direction
+  nprocx=$(ls cape.x*y000* | wc -l | tr -d ' ')
+  echo "Nprocx" = ${nprocx}
   # Find variable names
   varnames=$(./cdo -s showvar $filename)
   echo "Variables found: ${varnames}"
   for varname in $varnames
   do
     echo "Start merging ${varname}"
-    ./cdo -f nc4 -z zip_6 -r -O collgrid,$nprocy,$varname `ls cape.* | sort -t y -k 3` "cape/${varname}.${iexpnr}.nc"
+    ./cdo -f nc4 -z zip_6 -r -O collgrid,$nprocx,$varname `ls cape.* | sort -t y -k 3` "cape/${varname}.${iexpnr}.nc"
   done
 fi
