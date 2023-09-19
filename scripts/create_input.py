@@ -2,12 +2,16 @@
 import json
 from GridDales import GridDales
 from prep_harmonie import prep_harmonie
+import prep_harmonie_WINS50
 from initial_fields import initial_fields, initial_fields_fine
 from boundary_fields import boundary_fields, boundary_fields_fine
 from profiles import profiles
 from surface_temperature import surface_temperature, surface_temperature_fine
 from synthetic_turbulence import synthetic_turbulence
 from gaussian_filter import gaussian_filter
+from lsm.create_dales_input import create_lsm_input
+from lsm.spatial_transforms import proj4_rd, proj4_hm
+from datetime import datetime
 import sys
 #%% Read input file
 with open(sys.argv[1]) as f: input = json.load(f)
@@ -20,6 +24,8 @@ if 'coarse' in input:
   #%% Transfor input data to rectilinear grid and to prognostic variables of DALES
   if(input_coarse['source'].lower() == 'harmonie'):
     data,transform = prep_harmonie(input_coarse,grid)
+  elif(input_coarse['source'].lower() == 'harmonie_wins50'):
+    data,transform = prep_harmonie_WINS50.prep_harmonie(input_coarse,grid)
   else:
     print('unvalid source type')
     exit()
