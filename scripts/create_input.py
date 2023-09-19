@@ -32,6 +32,19 @@ if 'coarse' in input:
   #%% Apply spatial horizontal Gaussian filter to data
   if('filter' in input_coarse):
     data = gaussian_filter(data,input_coarse)
+
+  if 'LSM' in input_coarse:
+    x_sw, y_sw = proj4_hm(input_coarse['lon_sw'], input_coarse['lat_sw'], inverse=False)
+    print(f'LSM {x_sw}, {y_sw}.')
+    dx = input_coarse['grid']['xsize'] / input_coarse['grid']['itot']
+    dy = input_coarse['grid']['ysize'] / input_coarse['grid']['jtot']
+    start_date = datetime.fromisoformat(input_coarse['start'])
+    create_lsm_input(x_sw, y_sw, input_coarse['grid']['itot'], input_coarse['grid']['jtot'], dx, dy,
+                     input_coarse['nprocx'], input_coarse['nprocy'], start_date,
+                     input_coarse['outpath'], input_coarse['LSM']['ERA5_path'], input_coarse['LSM']['spatial_data_path'],
+                     input_coarse['iexpnr'])
+    print('Finished creating LSM input')
+
   #%% Advective time interpolation of input data (optional, to be implemented)
   
   #%% Create initial fields > initfields.inp.xxx.nc
