@@ -35,6 +35,7 @@ def synthetic_turbulence(input,grid,data,transform):
   uv     = xr.where(np.isnan(uv),0.,uv)
   # Get wthls
   wthls = data['wthls'].sel(x=slice(0,grid.xsize),y=slice(0,grid.ysize)).mean(dim=['x','y'])
+  wthls = np.maximum(wthls, 1e-3) # ensure wthls > 0
   wthl  = xr.where(mask,wthls*(1-1.2*u2.coords['zt']/zi),0.).rename('wthl')\
     .transpose('time','zt')\
     .expand_dims(dim={'ypatch': [grid.ysize/2], 'xpatch': [grid.xsize/2]},axis=[2,3])\
