@@ -1,58 +1,136 @@
-def main():
-  # %% Paths to aus2200 level data, aus2200 surface data, and path to write transformed data to
-  pathDataLev  = '/g/data/hh5/tmp/WACI-Hackathon-2023/AUS2200/data/lev/1hr/'
-  pathDataSurf = '/g/data/hh5/tmp/WACI-Hackathon-2023/AUS2200/data/surf/1hr/'
-  fileOrog     = pathDataSurf+'orog_1hr_20220222_20220307.nc'
-  pathWrite    = '/home/565/fl2086/aus2200_DALES/aus2200/utm/'
-  # lat/lon box to transform
-  latS   = -22
-  latN   = -20
-  lonW   =  146
-  lonE   =  150
-  buffer = 0.1
-  dx     = 2200
-  dy     = 2200
-  # Time window to transform
-  timeStart = '2022-03-05 00:00:00'
-  timeEnd   = '2022-03-06 00:00:00' # included
-  # Variables to do
-  varsLev  = []
-  varsSurf = ['hfss','hfls','tauu','tauv']
-  # Time chunking
-  tchunk = 1
-
-  for varName in varsLev:
-    print(varName)
-    var,orog = loadData(pathDataLev,varName,fileOrog,timeStart,timeEnd,latS,latN,lonW,lonE,buffer,tchunk)
-    var_zint = InterpolateZ(orog,var,timeDim='time',otherDims={'lon':'lon','lat':'lat'},level_choice='auto',quiet=False,byChunks=True).load()
-    var_zint_utm = wgs84_to_utm(var_zint.chunk({'time':tchunk}),dx,dy,latS,latN,lonW,lonE,byChunks=True).load()
-    var_zint_utm.to_netcdf(path=f"{pathWrite}{varName}.nc")
+# Crops the AUS2200 data to the required time and spatial extends. 
+# Transforms sigma coordinates into height levels.
+# Transforms wgs84 to local utm coordinates
+# Transforms AUS2200 prognostic variables to DALES prognostic variables
+import glob
+import numpy as np
+import xarray as xr
+import pyproj
+from pyproj import Transformer
+from pyproj import CRS
+from pyproj.aoi import AreaOfInterest
+from pyproj.database import query_utm_crs_info
+import dask.array as da
+import dask.delayed as ddelay
+from numba import jit
+# Constants
+# Simulation constants (modglobal)
+p0   = 1e5          # Reference pressure
+Rd   = 287.04       # Gas constant for dry air
+Rv   = 461.5        # Gas constant for water vapor
+cp   = 1004.        # Specific heat at constant pressure (dry air)
+Lv   = 2.53e6       # Latent heat for vaporisation
+grav = 9.81         # Gravitational constant
+kappa= 0.4          # Von Karman constant
+def prep_aus2200(input,grid):
+  # Create transform to go from lat lon to local rectilinear grid
+  transform = Transform([input['lon_sw'],input['lon_sw']+grid.xsize/100000],\
+                        [input['lat_sw'],input['lat_sw']+grid.ysize/100000])
+  x_sw,y_sw = transform.latlon_to_xy(input['lat_sw'],input['lon_sw'])
+  # Translate to make southwest corner of DALES origin
+  transform.update_parameters(x_0=transform.parameters['x_0']-x_sw,\
+                              y_0=transform.parameters['y_0']-y_sw)
+  x_sw,y_sw = transform.latlon_to_xy(input['lat_sw'],input['lon_sw'])
+  # Get domain box in WGS84
+  lat_ne,lon_ne = transform.xy_to_latlon(grid.xsize,grid.ysize)
+  lat_se,lon_se = transform.xy_to_latlon(grid.xsize,0)
+  lat_nw,lon_nw = transform.xy_to_latlon(0,grid.ysize)
+  lat_min       = np.array([input['lat_sw'],lat_se,lat_ne,lat_nw]).min()
+  lat_max       = np.array([input['lat_sw'],lat_se,lat_ne,lat_nw]).max()
+  lon_min       = np.array([input['lon_sw'],lon_se,lon_ne,lon_nw]).min()
+  lon_max       = np.array([input['lon_sw'],lon_se,lon_ne,lon_nw]).max()
+  buffer        = 0.05
+  # Variables to read
+  # filenames = glob.glob(datadir+"u/*/*.nc")
+  # variables3D   = ['ua','va','wa','ta','hus','clw']
+  # variablesSurf = ['ps','tas','huss']
+  # Get model level files
+  varCodes = ['fld_s00i002','fld_s00i003','fld_s00i150','fld_s00i004','fld_s00i010']
+  # varNames = ['u','v','w','theta','qv']
+  varNames = ['u','v','w','thl','qt']
+  if('synturb' in input):
+    varCodes   = varCodes+['fld_s03i473']
+    varNames  = varNames+['tke']
+  def read_variables(filenames,varCodes,varNames,lsurf=False):
+    data = []
+    for filename in filenames:
+      with xr.open_dataset(filename) as ds:
+        ds = ds.sel(time=slice(input['start'],input['end']))
+        if(len(ds['time'])<1): continue
+        ds_new = []
+        for ivar in range(len(varCodes)):
+          var = ds[varCodes[ivar]]
+          dims = var.dims
+          var = var.sel({dims[-2]:slice(lat_min-buffer,lat_max+buffer),\
+                         dims[-1]:slice(lon_min-buffer,lon_max+buffer)})
+          var = var.swap_dims({dims[-3]:dims[-3].replace('model_','').replace('number','height')})
+          dims = var.dims
+          var = var.rename(varNames[ivar])
+          var = var.rename({dims[-3]:'z'})
+          if(dims[0]!='time'):
+            var[dims[0]]=ds['time']
+            var = var.rename({dims[0]:'time'})
+          if(dims[-2]!='lat'): var = var.rename({dims[-2]:'lat'})
+          if(dims[-1]!='lon'): var = var.rename({dims[-1]:'lon'})
+          if(dims[-3]!='theta_level_height'): var = var.interp(z=ds['theta_level_height'].values)
+          var = wgs84_to_utm(var,2200,2200,grid.xsize,grid.ysize,transform,byChunks=False)
+          ds_new.append(var)
+        ds_new = xr.merge(ds_new)
+      data.append(ds_new)
+    data = xr.concat(data[:],'time')
+    return data
+  def get_ncName(filename):
+    return filename.split('/')[-1]
+  filenames = glob.glob(input['inpath']+"*/aus2200/d0198/RA3/um/umnsa_mdl_*.nc")
+  filenames.sort(key=get_ncName)
+  data = read_variables(filenames,varCodes,varNames,transform)
+  data = data.assign({'transform' : xr.DataArray([],name='Transverse_Mercator',attrs=transform.parameters)})
+  return data,transform
+  # Read orography data
+  # with xr.open_dataset(input['fileOrog']) as ds:
+  #   ds  = ds.rename({ds['orog'].dims[-2]: 'lat', ds['orog'].dims[-1]: 'lon'})
+  #   orog = ds.orog[0,:,:].sel(lat=slice(lat_min-buffer,lat_max+buffer),lon=slice(lon_min-buffer,lon_max+buffer))
+  # # Get 3D variables on rectilinear grid
+  # for var in variables3D:
+  #   with xr.open_mfdataset(f"{input['inpath3D']}{var}_*.nc",chunks={"time": input['tchunk']}) as ds:
+  #     ds  = ds.rename({ds[var].dims[-2]: 'lat', ds[var].dims[-1]: 'lon'})
+  #     data.append(ds[var].sel(time=slice(input['start'], input['end']),\
+  #                                 lat=slice(lat_min-buffer,lat_max+buffer),\
+  #                                 lon=slice(lon_min-buffer,lon_max+buffer)))
+  #     data[-1] = InterpolateZ(orog,data[-1],timeDim='time',otherDims={'lon':'lon','lat':'lat'},level_choice='auto',quiet=False,byChunks=True).load()
+  #     data[-1] = wgs84_to_utm(data[-1].chunk({'time':input['tchunk']}),2200,transform,byChunks=True).load() 
+    # var,orog = loadData(pathDataLev,varName,fileOrog,timeStart,timeEnd,latS,latN,lonW,lonE,buffer,tchunk)
+    # var_zint = InterpolateZ(orog,var,timeDim='time',otherDims={'lon':'lon','lat':'lat'},level_choice='auto',quiet=False,byChunks=True).load()
+    # var_zint_utm = wgs84_to_utm(var_zint.chunk({'time':tchunk}),dx,dy,latS,latN,lonW,lonE,byChunks=True).load()
+    # var_zint_utm.to_netcdf(path=f"{pathWrite}{varName}.nc")
   
-  for varName in varsSurf:
-    print(varName)
-    var,_ = loadData(pathDataSurf,varName,fileOrog,timeStart,timeEnd,latS,latN,lonW,lonE,buffer,tchunk)
-    var_utm = wgs84_to_utm(var,dx,dy,latS,latN,lonW,lonE,byChunks=True).load()
-    var_utm.to_netcdf(path=f"{pathWrite}{varName}.nc")
+  # Get surface variables on rectilinear grid
+  # for var in variablesSurf:
+  #   print(varName)
+  #   var,_ = loadData(pathDataSurf,varName,fileOrog,timeStart,timeEnd,latS,latN,lonW,lonE,buffer,tchunk)
+  #   var_utm = wgs84_to_utm(var,dx,dy,latS,latN,lonW,lonE,byChunks=True).load()
+  #   var_utm.to_netcdf(path=f"{pathWrite}{varName}.nc")
 
+  # Convert to DALES prognostic variables
 # Load data and clip to window
-def loadData(path,varName,fileOrog,timeStart,timeEnd,latS,latN,lonW,lonE,buffer,tchunk):
-  import xarray as xr
-  import os
-  var = []
-  for file in sorted(os.listdir(f"{path}")):
-    if(file.startswith(f"{varName}_1hr_") and file.endswith('.nc')):
-      with xr.open_dataset(f"{path}{file}",chunks={"time": tchunk}) as ds:
-        ds  = ds.rename({ds[varName].dims[-2]: 'lat', ds[varName].dims[-1]: 'lon'})
-        var.append(ds[varName].sel(lat=slice(latS-buffer,latN+buffer),lon=slice(lonW-buffer,lonE+buffer)))
-  var = xr.concat(var[:],'time')
-  var = var.sel(time=slice(timeStart, timeEnd))
-  # with xr.open_mfdataset(f"{path}{varName}_*.nc",chunks={"time": tchunk},data_vars=[varName],preprocess=preprocess) as ds:
-  #   ds  = ds.rename({ds[varName].dims[-2]: 'lat', ds[varName].dims[-1]: 'lon'})
-  #   var = ds[varName].sel(time=slice(timeStart, timeEnd),lat=slice(latS-buffer,latN+buffer),lon=slice(lonW-buffer,lonE+buffer))
-  with xr.open_dataset(fileOrog) as ds:
-    ds  = ds.rename({ds['orog'].dims[-2]: 'lat', ds['orog'].dims[-1]: 'lon'})
-    orog = ds.orog[0,:,:].sel(lat=slice(latS,latN),lon=slice(lonW,lonE))
-  return var,orog   
+# def loadData(path,varName,fileOrog,timeStart,timeEnd,latS,latN,lonW,lonE,buffer,tchunk):
+#   import xarray as xr
+#   import os
+#   var = []
+#   for file in sorted(os.listdir(f"{path}")):
+#     if(file.startswith(f"{varName}_1hr_") and file.endswith('.nc')):
+#       with xr.open_dataset(f"{path}{file}",chunks={"time": tchunk}) as ds:
+#         ds  = ds.rename({ds[varName].dims[-2]: 'lat', ds[varName].dims[-1]: 'lon'})
+#         var.append(ds[varName].sel(lat=slice(latS-buffer,latN+buffer),lon=slice(lonW-buffer,lonE+buffer)))
+#   var = xr.concat(var[:],'time')
+#   var = var.sel(time=slice(timeStart, timeEnd))
+#   # with xr.open_mfdataset(f"{path}{varName}_*.nc",chunks={"time": tchunk},data_vars=[varName],preprocess=preprocess) as ds:
+#   #   ds  = ds.rename({ds[varName].dims[-2]: 'lat', ds[varName].dims[-1]: 'lon'})
+#   #   var = ds[varName].sel(time=slice(timeStart, timeEnd),lat=slice(latS-buffer,latN+buffer),lon=slice(lonW-buffer,lonE+buffer))
+#   with xr.open_dataset(fileOrog) as ds:
+#     ds  = ds.rename({ds['orog'].dims[-2]: 'lat', ds['orog'].dims[-1]: 'lon'})
+#     orog = ds.orog[0,:,:].sel(lat=slice(latS,latN),lon=slice(lonW,lonE))
+#   return var,orog   
 
 # Interpolate data to geometric height levels
 def InterpolateZ(orog,var,timeDim='time',otherDims={'lon':'lon','lat':'lat'},level_choice='auto',quiet=False,byChunks=True):
@@ -231,51 +309,25 @@ def InterpolateZ(orog,var,timeDim='time',otherDims={'lon':'lon','lat':'lat'},lev
   return outVar
 
 # Convert data from lat lon grid to x y grid (wgs84 -> utm)
-def wgs84_to_utm(var,dx,dy,latS,latN,lonW,lonE,byChunks=False):
-  import numpy as np
-  import xarray as xr
-  from pyproj import Transformer
-  from pyproj import CRS
-  from pyproj.aoi import AreaOfInterest
-  from pyproj.database import query_utm_crs_info
-  import dask.array as da
-  import dask.delayed as ddelay
-  # Get the UTM zone corresponding to the window
-  utm_crs_list = query_utm_crs_info(
-    datum_name="WGS 84",
-    area_of_interest=AreaOfInterest(
-        west_lon_degree=var.lon.min(),
-        south_lat_degree=var.lat.min(),
-        east_lon_degree=var.lon.max(),
-        north_lat_degree=var.lat.max(),
-    ),
-  )
-  target_crs = CRS.from_epsg(utm_crs_list[0].code)
-  print(f"Target crs {target_crs}")
-  # Construct transform and transform coordinates
-  source_crs = 'epsg:4326'
-  latlon_to_utm = Transformer.from_crs(source_crs,target_crs)
+def wgs84_to_utm(var,dx,dy,xsize,ysize,transform,byChunks=False):
   Lon,Lat = np.meshgrid(var.lon,var.lat)
-  X,Y = latlon_to_utm.transform(Lat,Lon)
+  X,Y = transform.latlon_to_xy(Lat,Lon)
   var.coords['x'] = (('lat','lon'), X)
   var.coords['y'] = (('lat','lon'), Y)
   var.x.attrs['axis']='X'
   var.x.attrs['units']='m'
   var.x.attrs['standard_name']='projection_x_coordinate'
-  var.x.attrs['long_name'] =f"X Coordinate Of Projection {target_crs}"
+  var.x.attrs['long_name'] =f"X Coordinate Of Projection"
   var.y.attrs['axis']='Y'
   var.y.attrs['units']='m'
   var.y.attrs['standard_name']='projection_y_coordinate'
-  var.y.attrs['long_name'] =f"Y Coordinate Of Projection {target_crs}"
+  var.y.attrs['long_name'] =f"Y Coordinate Of Projection"
   # Find rectangular grid
-  Lon,Lat = np.meshgrid(np.array([latS,latN]),np.array([lonW,lonE]))
-  X,Y = latlon_to_utm.transform(Lon,Lat)
-  x_int = np.arange(X.min(),X.max()+dx,dx)
-  y_int = np.arange(Y.min(),Y.max()+dy,dy)
+  x_int = np.arange(0,xsize+2*dx,dx)
+  y_int = np.arange(0,ysize+2*dy,dy)
   X_int,Y_int = np.meshgrid(x_int,y_int)
   # Find lat and lon for new variable
-  utm_to_latlon = Transformer.from_crs(target_crs,source_crs)
-  newLat,newLon = utm_to_latlon.transform(X_int,Y_int)
+  newLat,newLon = transform.xy_to_latlon(X_int,Y_int)
   # Set dimensions and coordinates new variable
   if(len(var.shape)==3): # Surface variable
     newCoords = {'time' :var.coords['time'],
@@ -360,13 +412,47 @@ def wgs84_to_utm(var,dx,dy,latS,latN,lonW,lonE,byChunks=False):
   varInt.x.attrs['axis']='X'
   varInt.x.attrs['units']='m'
   varInt.x.attrs['standard_name']='projection_x_coordinate'
-  varInt.x.attrs['long_name'] =f"X Coordinate Of Projection {target_crs}"
+  varInt.x.attrs['long_name'] =f"X Coordinate Of Projection"
   varInt.y.attrs['axis']='Y'
   varInt.y.attrs['units']='m'
   varInt.y.attrs['standard_name']='projection_y_coordinate'
-  varInt.y.attrs['long_name'] =f"Y Coordinate Of Projection {target_crs}"
+  varInt.y.attrs['long_name'] =f"Y Coordinate Of Projection"
   return varInt
+class Transform:
+  def __init__(self,lon,lat):
+    # Get the UTM zone corresponding to the window
+    utm_crs_list = query_utm_crs_info(
+      datum_name="WGS 84",
+      area_of_interest=AreaOfInterest(
+          west_lon_degree=min(lon),
+          south_lat_degree=min(lat),
+          east_lon_degree=max(lon),
+          north_lat_degree=max(lat),
+      ),
+    )
+    self.crs_latlon = 'epsg:4326'
+    self.crs_utm = 'epsg:'+utm_crs_list[0].code
+    wkt = CRS.from_epsg(utm_crs_list[0].code).to_wkt()
+    k_0 = float(wkt.split('\"Scale factor at natural origin\",')[-1].split(',')[0])
+    lat_0 = float(wkt.split('\"Latitude of natural origin\",')[-1].split(',')[0])
+    lon_0 = float(wkt.split('\"Longitude of natural origin\",')[-1].split(',')[0])
+    x_0 = float(wkt.split('\"False easting\",')[-1].split(',')[0])
+    y_0 = float(wkt.split('\"False northing\",')[-1].split(',')[0])
+    self.update_parameters(k_0=k_0,lat_0=lat_0,lon_0=lon_0,x_0=x_0,y_0=y_0)
 
-# %%
-if __name__ == "__main__": main()
-# %%
+  def update_parameters(self,k_0=None,lat_0=None,lon_0=None,x_0=None,y_0=None):
+    k_0 = k_0 if k_0!=None else self.parameters['k_0']
+    lat_0 = lat_0 if lat_0!=None else self.parameters['lat_0']
+    lon_0 = lon_0 if lon_0!=None else self.parameters['lon_0']
+    x_0 = x_0 if x_0!=None else self.parameters['x_0']
+    y_0 = y_0 if y_0!=None else self.parameters['y_0']
+    self.parameters = dict(ellps='WGS84',k_0=k_0,lat_0=lat_0,lon_0=lon_0,x_0=x_0,y_0=y_0,proj4=\
+    f"+proj=tmerc +ellps=WGS84 +k_0={k_0} +lat_0={lat_0} +lon_0={lon_0} +x_0={x_0} +y_0={y_0}")
+    self.latlon_to_xy_transform = Transformer.from_crs(self.crs_latlon,self.parameters['proj4'])
+    self.xy_to_latlon_transform = Transformer.from_crs(self.parameters['proj4'],self.crs_latlon)
+
+  def latlon_to_xy(self,lat,lon):
+    return self.latlon_to_xy_transform.transform(lat,lon)
+  
+  def xy_to_latlon(self,x,y):
+    return self.xy_to_latlon_transform.transform(x,y)

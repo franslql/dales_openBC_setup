@@ -2,6 +2,7 @@
 import json
 from GridDales import GridDales
 from prep_harmonie import prep_harmonie
+from prep_aus2200 import prep_aus2200
 from initial_fields import initial_fields, initial_fields_fine
 from boundary_fields import boundary_fields, boundary_fields_fine
 from profiles import profiles
@@ -11,6 +12,7 @@ from gaussian_filter import gaussian_filter
 import sys
 #%% Read input file
 with open(sys.argv[1]) as f: input = json.load(f)
+# with open('input_coarse_aus2200.json') as f: input = json.load(f)
 #%% Create input for outer simulation
 if 'coarse' in input:
   input_coarse = input['coarse']
@@ -20,6 +22,12 @@ if 'coarse' in input:
   #%% Transfor input data to rectilinear grid and to prognostic variables of DALES
   if(input_coarse['source'].lower() == 'harmonie'):
     data,transform = prep_harmonie(input_coarse,grid)
+  elif(input_coarse['source'].lower() == 'aus2200'):
+    # import importlib
+    # import prep_aus2200
+    # importlib.reload(prep_aus2200)
+    # from prep_aus2200 import prep_aus2200
+    data,transform = prep_aus2200(input_coarse,grid)
   else:
     print('unvalid source type')
     exit()
