@@ -1,0 +1,27 @@
+{ "author": "Frans Liqui Lung",
+  "coarse": {
+     "source": "COSMO",
+     "inpath":"../cosmo/",
+     "outpath":"../simulations/cosmo/",
+     "start":"2020-01-01T00:00",
+     "end":  "2020-01-01T04:00",
+     "time0": "2020-01-01T00:00",
+     "iexpnr": 1,
+     "lat_sw": 10,
+     "lon_sw": -61,
+     "e12": 0.01,
+     "nsv": 2,
+     "nprocx": 16,
+     "nprocy":  8,
+     "tchunk": 1,
+     "grid": {
+      "xsize": 40000,
+      "ysize": 20000,
+      "itot": 64,
+      "jtot": 62,
+      "kmax": 150,
+      "dz0": 20,
+      "alpha": 0.012
+      }
+   }
+}
