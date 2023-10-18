@@ -17,19 +17,19 @@ def synthetic_turbulence(input,grid,data,transform):
   mask = (u2.coords['zt']<=zi)
   ustar = data['ustar'].sel(x=slice(0,grid.xsize),y=slice(0,grid.ysize)).mean(dim=['x','y'])
   vstar = data['vstar'].sel(x=slice(0,grid.xsize),y=slice(0,grid.ysize)).mean(dim=['x','y'])
-  uw = xr.where(mask,ustar*(1-u2.coords['zt']/zi),0.).rename('uw')\
+  uw = xr.where(mask,ustar**2*(1-u2.coords['zt']/zi),0.).rename('uw')\
     .transpose('time','zt')\
     .expand_dims(dim={'ypatch': [grid.ysize/2], 'xpatch': [grid.xsize/2]},axis=[2,3])\
     .chunk({'time': input['tchunk']})
-  vw = xr.where(mask,vstar*(1-u2.coords['zt']/zi),0.).rename('vw')\
+  vw = xr.where(mask,vstar**2*(1-u2.coords['zt']/zi),0.).rename('vw')\
     .transpose('time','zt')\
     .expand_dims(dim={'ypatch': [grid.ysize/2], 'xpatch': [grid.xsize/2]},axis=[2,3])\
     .chunk({'time': input['tchunk']})
   # Get uv from requirement that matrix needs to be positive and take uv closest to zero
   uv_min = -np.sqrt((uw*vw/e)**2+e**2-uw**2-vw**2)-uw*vw/e
-  uv_min = uv_min-0.01*abs(uv_min)
+  uv_min = uv_min+0.01*abs(uv_min)
   uv_max =  np.sqrt((uw*vw/e)**2+e**2-uw**2-vw**2)-uw*vw/e
-  uv_max = uv_max+0.01*abs(uv_max)
+  uv_max = uv_max-0.01*abs(uv_max)
   uv     = np.minimum(np.maximum(uv_min,0.),uv_max).rename('uv')\
     .transpose('time','zt','ypatch','xpatch')
   uv     = xr.where(np.isnan(uv),0.,uv)
