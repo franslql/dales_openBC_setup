@@ -48,10 +48,14 @@ def prep_aus2200(input,grid):
   varCodes = ['fld_s00i002','fld_s00i003','fld_s00i150','fld_s00i004','fld_s00i010']
   # varNames = ['u','v','w','theta','qv']
   varNames = ['u','v','w','thl','qt']
+  varCodes_surf = ['fld_s16i222','fld_s03i236','fld_s03i237'] 
+  varNames_surf = ['ps','Ts','qt']
   if('synturb' in input):
     varCodes   = varCodes+['fld_s03i473']
     varNames  = varNames+['tke']
-  def read_variables(filenames,varCodes,varNames,lsurf=False):
+    varCodes_surf = varCodes_surf+['fld_s00i025','fld_s03i460_0','fld_s03i461_0','fld_s03i217']
+    varNames_surf = varNames_surf+['zi','ustar','vstar','wthls']
+  def read_variables(filenames,varCodes,varNames,transform,lsurf=False):
     data = []
     for filename in filenames:
       with xr.open_dataset(filename) as ds:
@@ -63,16 +67,17 @@ def prep_aus2200(input,grid):
           dims = var.dims
           var = var.sel({dims[-2]:slice(lat_min-buffer,lat_max+buffer),\
                          dims[-1]:slice(lon_min-buffer,lon_max+buffer)})
-          var = var.swap_dims({dims[-3]:dims[-3].replace('model_','').replace('number','height')})
+          if not(lsurf): 
+            var = var.swap_dims({dims[-3]:dims[-3].replace('model_','').replace('number','height')})
+            var = var.rename({var.dims[-3]:'z'})
+            if(dims[-3]!='theta_level_height'): var = var.interp(z=ds['theta_level_height'].values)
           dims = var.dims
           var = var.rename(varNames[ivar])
-          var = var.rename({dims[-3]:'z'})
           if(dims[0]!='time'):
-            var[dims[0]]=ds['time']
             var = var.rename({dims[0]:'time'})
+            var = var.assign_coords({'time':ds.time.values})    
           if(dims[-2]!='lat'): var = var.rename({dims[-2]:'lat'})
           if(dims[-1]!='lon'): var = var.rename({dims[-1]:'lon'})
-          if(dims[-3]!='theta_level_height'): var = var.interp(z=ds['theta_level_height'].values)
           var = wgs84_to_utm(var,2200,2200,grid.xsize,grid.ysize,transform,byChunks=False)
           ds_new.append(var)
         ds_new = xr.merge(ds_new)
@@ -83,8 +88,41 @@ def prep_aus2200(input,grid):
     return filename.split('/')[-1]
   filenames = glob.glob(input['inpath']+"*/aus2200/d0198/RA3/um/umnsa_mdl_*.nc")
   filenames.sort(key=get_ncName)
-  data = read_variables(filenames,varCodes,varNames,transform)
+  data = read_variables(filenames,varCodes,varNames,transform,lsurf=False)
+  filenames = glob.glob(input['inpath']+"*/aus2200/d0198/RA3/um/umnsa_slv_*.nc")
+  filenames.sort(key=get_ncName)
+  datas = read_variables(filenames,varCodes_surf,varNames_surf,transform,lsurf=True)
+  datas = datas.assign({'transform' : xr.DataArray([],name='Transverse_Mercator',attrs=transform.parameters)})
+  datas = datas.assign({'u' : xr.zeros_like(datas.qt),
+                        'v' : xr.zeros_like(datas.qt),
+                        'w' : xr.zeros_like(datas.qt)})
+  datas = datas.expand_dims({'z': np.array([0.])},axis=1)
+  # Calculate surface thl
+  tas_exnr = datas['Ts'].isel({'time': 0},drop=True).sel(x=slice(0,grid.xsize),y=slice(0,grid.ysize)).mean(dim=['x','y']).values
+  ps_exnr  = datas['ps'].isel({'time': 0},drop=True).sel(x=slice(0,grid.xsize),y=slice(0,grid.ysize)).mean(dim=['x','y']).values
+  exnrs    = (ps_exnr/p0)**(Rd/cp)
+  thls_exnr= tas_exnr/exnrs
+  exnr     = xr.DataArray(exnrs,
+                          dims = ['z'],
+                          coords={'z': [0.]},
+                          name = 'exnr',
+                          attrs = {'thls': thls_exnr, 'ps': ps_exnr})
+  datas    = datas.assign({'thl':datas.Ts/exnrs, 'exnr':exnr})
+  datas = datas.drop(labels=['ps','Ts'])
+  if('synturb' in input): 
+    rhobf    = calcBaseprof(data.z.values,thls_exnr,ps_exnr,pref0=p0)
+    rhobs    = rhobf[0]-data.z[0].values*(rhobf[1]-rhobf[0])/(data.z[1].values-data.z[0].values)
+    datas['wthls'] = datas['wthls']/(exnrs*rhobs*cp)
+    datas = datas.assign({'tke' : xr.zeros_like(datas.qt)})
+  data = xr.concat([datas,data],dim='z')
   data = data.assign({'transform' : xr.DataArray([],name='Transverse_Mercator',attrs=transform.parameters)})
+  if('synturb' in input):
+    print('inside')
+    data['ustar'] = data['ustar'].isel(z=0,drop=True)
+    data['vstar'] = data['vstar'].isel(z=0,drop=True)
+    data['zi'] = data['zi'].isel(z=0,drop=True).mean(dim=['x','y'])
+    data['wthls'] = data['wthls'].isel(z=0,drop=True)
+  print(data)
   return data,transform
   # Read orography data
   # with xr.open_dataset(input['fileOrog']) as ds:
@@ -418,6 +456,7 @@ def wgs84_to_utm(var,dx,dy,xsize,ysize,transform,byChunks=False):
   varInt.y.attrs['standard_name']='projection_y_coordinate'
   varInt.y.attrs['long_name'] =f"Y Coordinate Of Projection"
   return varInt
+
 class Transform:
   def __init__(self,lon,lat):
     # Get the UTM zone corresponding to the window
@@ -456,3 +495,46 @@ class Transform:
   
   def xy_to_latlon(self,x,y):
     return self.xy_to_latlon_transform.transform(x,y)
+
+def calcBaseprof(zt,thls,ps,pref0=1e5):
+  # constants
+  lapserate=np.array([-6.5/1000.,0.,1./1000,2.8/1000])
+  zmat=np.array([11000.,20000.,32000.,47000.])
+  grav=9.81
+  rd=287.04
+  cp=1004.
+  zsurf=0
+  k1=len(zt)
+  # Preallocate
+  pmat=np.zeros(4)
+  tmat=np.zeros(4)
+  rhobf=np.zeros(k1)
+  pb=np.zeros(k1)
+  tb=np.zeros(k1)
+  # DALES code
+  tsurf=thls*(ps/pref0)**(rd/cp)
+  pmat[0]=np.exp((np.log(ps)*lapserate[0]*rd+np.log(tsurf+zsurf*lapserate[0])*grav-
+    np.log(tsurf+zmat[0]*lapserate[0])*grav)/(lapserate[0]*rd))
+  tmat[0]=tsurf+lapserate[0]*(zmat[0]-zsurf);
+  for j in np.arange(1,4):
+      if(abs(lapserate[j])<1e-10):
+          pmat[j]=np.exp((np.log(pmat[j-1])*tmat[j-1]*rd+zmat[j-1]*grav-zmat[j]*grav)/(tmat[j-1]*rd))
+      else:
+          pmat[j]=np.exp((np.log(pmat[j-1])*lapserate[j]*rd+np.log(tmat[j-1]+zmat[j-1]*lapserate[j])*grav-np.log(tmat[j-1]+zmat[j]*lapserate[j])*grav)/(lapserate[j]*rd))
+      tmat[j]=tmat[j-1]+lapserate[j]*(zmat[j]-zmat[j-1]);
+
+  for k in range(k1):
+      if(zt[k]<zmat[0]):
+          pb[k]=np.exp((np.log(ps)*lapserate[0]*rd+np.log(tsurf+zsurf*lapserate[0])*grav-np.log(tsurf+zt[k]*lapserate[0])*grav)/(lapserate[0]*rd))
+          tb[k]=tsurf+lapserate[0]*(zt[k]-zsurf)
+      else:
+          j=0
+          while(zt[k]>=zmat[j]):
+            j=j+1
+          tb[k]=tmat[j-1]+lapserate[j]*(zt[k]-zmat[j-1])
+          if(abs(lapserate[j])<1e-99):
+              pb[k]=np.exp((np.log(pmat[j-1])*tmat[j-1]*rd+zmat[j-1]*grav-zt[k]*grav)/(tmat[j-1]*rd))
+          else:
+              pb[k]=np.exp((np.log(pmat[j-1])*lapserate[j]*rd+np.log(tmat[j-1]+zmat[j-1]*lapserate[j])*grav-np.log(tmat[j-1]+zt[k]*lapserate[j])*grav)/(lapserate[j]*rd))
+      rhobf[k]=pb[k]/(rd*tb[k]) # dry estimate
+  return rhobf

@@ -1,0 +1,34 @@
+{ "author": "Frans Liqui Lung",
+  "coarse": {
+     "source": "AUS2200",
+     "inpath":"/g/data/hh5/tmp/AUS2200/flood22-continuous/netcdf/",
+     "outpath":"/home/565/fl2086/dales_openBC_setup/simulations/aus2200/test/",
+     "start":"2022-02-25T00:00",
+     "end":  "2022-02-25T06:00",
+     "time0": "2022-02-25T00:00",
+     "iexpnr": 1,
+     "lat_sw": -19.5,
+     "lon_sw": 121,
+     "e12": 0.01,
+     "nsv": 2,
+     "nprocx": 16,
+     "nprocy":  8,
+     "tchunk": 1,
+     "grid": {
+      "xsize": 70400,
+      "ysize": 35200,
+      "itot": 128,
+      "jtot": 64,
+      "kmax": 150,
+      "dz0": 20,
+      "alpha": 0.012
+      },
+     "tskin": { 
+      "ERA5_path": "/g/data/rt52/era5/single-levels/reanalysis/skt/"
+      },
+      "synturb": {
+       "dx": 70400,
+       "dy": 35200
+       }
+   }
+}

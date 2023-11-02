@@ -5,9 +5,14 @@ from scipy.spatial import Delaunay
 from scipy.interpolate import LinearNDInterpolator
 import pandas as pd
 import dask
+import glob
 def surface_temperature(input,grid,data,transform):
-  with xr.open_mfdataset(f"{input['tskin']['ERA5_path']}*.nc",chunks={"time": input['tchunk']}) as ds:
-    tskin = ds.T_SKIN.sel(time=slice(input['start'],input['end']))/data.exnr.sel(z=0).values
+  def get_ncName(filename):
+    return filename.split('/')[-1]
+  filenames = glob.glob(f"{input['tskin']['ERA5_path']}*/*.nc")
+  filenames.sort(key=get_ncName)
+  with xr.open_mfdataset(filenames,chunks={"time": input['tchunk']}) as ds:
+    tskin = ds.skt.sel(time=slice(input['start'],input['end']))/data.exnr.sel(z=0).values
   # Transform from lat lon to rectilinear grid
   lat_era = tskin.lat.values
   lon_era = tskin.lon.values
