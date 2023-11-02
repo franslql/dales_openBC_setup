@@ -175,7 +175,7 @@ def prep_harmonie(input,grid):
     d1thl = dask.delayed(xr.concat)(d2thl,dim='time').compute()
     d2thl = dask.delayed(xr.concat)(d1thl,dim='time').compute()
     zi    = d2thl.where(d1thl>0).sel(z=slice(zi_min,zi_max)).idxmax('z').fillna(cbmean)
-    rhobs = rhobf[0]-grid.zt[0]*(rhobf[1]-rhobf[0])/(grid.zt[1]-grid.zt[0])
+    rhobs = rhobf[0]-z_int[0]*(rhobf[1]-rhobf[0])/(z_int[1]-z_int[0])
     ustar = np.sqrt(np.maximum(tauu,0)/rhobs).rename('ustar')
     vstar = np.sqrt(np.maximum(tauv,0)/rhobs).rename('vstar')
     wthls = (hfss/(exnrs*rhobs*cp)).rename('wthls') # convert to kinematic flux
