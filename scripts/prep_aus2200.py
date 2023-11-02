@@ -117,12 +117,10 @@ def prep_aus2200(input,grid):
   data = xr.concat([datas,data],dim='z')
   data = data.assign({'transform' : xr.DataArray([],name='Transverse_Mercator',attrs=transform.parameters)})
   if('synturb' in input):
-    print('inside')
     data['ustar'] = data['ustar'].isel(z=0,drop=True)
     data['vstar'] = data['vstar'].isel(z=0,drop=True)
     data['zi'] = data['zi'].isel(z=0,drop=True).mean(dim=['x','y'])
     data['wthls'] = data['wthls'].isel(z=0,drop=True)
-  print(data)
   return data,transform
   # Read orography data
   # with xr.open_dataset(input['fileOrog']) as ds:
