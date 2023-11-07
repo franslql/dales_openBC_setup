@@ -11,9 +11,23 @@ def surface_temperature(input,grid,data,transform):
     return filename.split('/')[-1]
   filenames = glob.glob(f"{input['tskin']['ERA5_path']}*/*.nc")
   filenames.sort(key=get_ncName)
+  # Get domain box in WGS84
+  lat_ne,lon_ne = transform.xy_to_latlon(grid.xsize,grid.ysize)
+  lat_se,lon_se = transform.xy_to_latlon(grid.xsize,0)
+  lat_nw,lon_nw = transform.xy_to_latlon(0,grid.ysize)
+  lat_min       = np.array([input['lat_sw'],lat_se,lat_ne,lat_nw]).min()
+  lat_max       = np.array([input['lat_sw'],lat_se,lat_ne,lat_nw]).max()
+  lon_min       = np.array([input['lon_sw'],lon_se,lon_ne,lon_nw]).min()
+  lon_max       = np.array([input['lon_sw'],lon_se,lon_ne,lon_nw]).max()
+  buffer        = 0.25
   with xr.open_mfdataset(filenames,chunks={"time": input['tchunk']}) as ds:
-    tskin = ds.skt.sel(time=slice(input['start'],input['end']))/data.exnr.sel(z=0).values
+    tskin = ds.skt.sel({'time':slice(input['start'],input['end']),\
+                        ds.skt.dims[-2]:slice(lat_max+buffer,lat_min-buffer),\
+                        ds.skt.dims[-1]:slice(lon_min-buffer,lon_max+buffer)})\
+                        /data.exnr.sel(z=0).values
   # Transform from lat lon to rectilinear grid
+  if(tskin.dims[-2]!='lat'): tskin = tskin.rename({tskin.dims[-2]:'lat'})
+  if(tskin.dims[-1]!='lon'): tskin = tskin.rename({tskin.dims[-1]:'lon'})
   lat_era = tskin.lat.values
   lon_era = tskin.lon.values
   Lon_era,Lat_era = np.meshgrid(lon_era,lat_era)
@@ -56,14 +70,14 @@ def surface_temperature(input,grid,data,transform):
                      )
   tskin_int = xr.merge([tskin_int,Lat,Lon],combine_attrs='drop')
   # Add transform
-  tskin_int = tskin_int.assign({'transform' : data['transform']})
+  tskin_int = tskin_int.assign({'transform' : xr.DataArray(data="",attrs=data['transform'].attrs)})
   # Set attributes
   tskin_int['time'] = tskin_int['time'].assign_attrs({'longname': 'Time', 'units': f"seconds since {input['time0']}"})
-  tskin_int['xt'] = tskin_int['xt'].assign_attrs({'longname': 'West-East displacement of cell centers','units': 'm'})
-  tskin_int['yt'] = tskin_int['yt'].assign_attrs({'longname': 'South-North displacement of cell centers','units': 'm'})
-  tskin_int['lat'] = tskin_int['lat'].assign_attrs({'longname': 'Latitude of cell centers','units': 'degrees_north'}) 
-  tskin_int['lon'] = tskin_int['lon'].assign_attrs({'longname': 'Longitude of cell centers','units': 'degrees_east'}) 
-  tskin_int['tskin'] = tskin_int['tskin'].assign_attrs({'longname': 'Skin temperature', 'units': 'K'})
+  tskin_int['xt'] = tskin_int['xt'].assign_attrs({'standard_name':'projection_x_coordinate','longname': 'X Coordinate Of Projection','units': 'm','axis':'X'})
+  tskin_int['yt'] = tskin_int['yt'].assign_attrs({'standard_name':'projection_y_coordinate','longname': 'Y Coordinate Of Projection','units': 'm','axis':'Y'})
+  tskin_int['lat'] = tskin_int['lat'].assign_attrs({'standard_name':'Latitude','longname': 'Latitude','units': 'degrees_north','_CoordinateAxisType':'Lat'}) 
+  tskin_int['lon'] = tskin_int['lon'].assign_attrs({'standard_name':'Longitude','longname': 'Longitude','units': 'degrees_east','_CoordinateAxisType':'Lon'}) 
+  tskin_int['tskin'] = tskin_int['tskin'].assign_attrs({'longname': 'Skin temperature', 'units': 'K','coordinates':'lon lat','grid_mapping':'Transverse_Mercator','cell_methods':'time: point'})
   tskin_int = tskin_int.assign_attrs({'title': f"tskin.inp.{input['iexpnr']:03d}.nc",
                                         'history': f"Created on {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC",
                                         'author': input['author'],
