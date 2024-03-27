@@ -7,6 +7,7 @@ from initial_fields import initial_fields, initial_fields_fine
 from boundary_fields import boundary_fields, boundary_fields_fine
 from profiles import profiles
 from surface_temperature import surface_temperature, surface_temperature_fine
+from surface_temperature_cosmo import surface_temperature_cosmo
 from synthetic_turbulence import synthetic_turbulence
 from gaussian_filter import gaussian_filter
 import sys
@@ -47,8 +48,11 @@ if 'coarse' in input:
     synturb = synthetic_turbulence(input_coarse,grid,data,transform)
     print('finished synthetic turbulence')
   #%% Create heterogeneous and time dependend skin temperature > tskin.inp.xxx.nc (if ltskin==true)
-  if('tskin' in input_coarse): 
-    tskin = surface_temperature(input_coarse,grid,data,transform)
+  if('tskin' in input_coarse):
+    if(input_coarse['source'].lower() == 'cosmo'): 
+      tskin = surface_temperature_cosmo(input_coarse,grid,data,transform)
+    else:
+      tskin = surface_temperature(input_coarse,grid,data,transform)
     print('finished surface temperature')
 
 #%% Write data to input files

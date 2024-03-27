@@ -76,7 +76,7 @@ def prep_cosmo(input,grid):
   datas = datas.assign({'u' : xr.zeros_like(datas.t),
                         'v' : xr.zeros_like(datas.t),
                         'w' : xr.zeros_like(datas.t),
-                        'qv': data.qv.isel(z=0),
+                        'qv': data.qv.isel(z=0,drop=True),
                         'ql': xr.zeros_like(datas.t)})
   datas = datas.expand_dims({'z': np.array([0.])},axis=1)
   data = xr.concat([datas,data],dim='z')
