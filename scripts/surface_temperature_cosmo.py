@@ -9,7 +9,6 @@ import dask
 def surface_temperature_cosmo(input,grid,data,transform):
   # Interpolate to DALES grid
   tskin_int = data['thl'].sel(z=0,drop=True).interp(y=grid.yt, x=grid.xt).rename('tskin').rename({'x':'xt','y':'yt'})
-  print(tskin_int)
   # Adjust time variable to seconds since initial field
   ts = tskin_int['time'].values.astype('datetime64[s]')
   dts = (ts-np.datetime64(input['time0'],'s'))/np.timedelta64(1, 's')
@@ -17,6 +16,10 @@ def surface_temperature_cosmo(input,grid,data,transform):
   tskin_int['time'].attrs.clear()
   # Add transform information
   tskin_int = tskin_int.to_dataset().assign({'transform' : data['transform']})
+  X,Y = np.meshgrid(tskin_int.xt,tskin_int.yt)
+  Lat,Lon = transform.xy_to_latlon(X,Y)
+  tskin_int['lat'][:,:] = Lat
+  tskin_int['lon'][:,:] = Lon
   # Set attributes
   tskin_int['time'] = tskin_int['time'].assign_attrs({'longname': 'Time', 'units': f"seconds since {input['time0']}"})
   tskin_int['xt'] = tskin_int['xt'].assign_attrs({'longname': 'West-East displacement of cell centers','units': 'm'})
