@@ -27,8 +27,8 @@ def prep_cosmo(input,grid):
                         [input['lat_sw'],input['lat_sw']+grid.ysize/100000])
   x_sw,y_sw = transform.latlon_to_xy(input['lat_sw'],input['lon_sw'])
   # Translate to make southwest corner of DALES origin
-  transform.update_parameters(x_0=transform.parameters['x_0']-x_sw,\
-                              y_0=transform.parameters['y_0']-y_sw)
+  transform.update_parameters(x_0=transform.parameters['false_easting']-x_sw,\
+                              y_0=transform.parameters['false_northing']-y_sw)
   # Get domain box in WGS84
   lat_ne,lon_ne = transform.xy_to_latlon(grid.xsize,grid.ysize)
   lat_se,lon_se = transform.xy_to_latlon(grid.xsize,0)
@@ -242,9 +242,9 @@ class Transform:
     k_0 = k_0 if k_0!=None else self.parameters['k_0']
     lat_0 = lat_0 if lat_0!=None else self.parameters['lat_0']
     lon_0 = lon_0 if lon_0!=None else self.parameters['lon_0']
-    x_0 = x_0 if x_0!=None else self.parameters['x_0']
-    y_0 = y_0 if y_0!=None else self.parameters['y_0']
-    self.parameters = dict(ellps='WGS84',k_0=k_0,lat_0=lat_0,lon_0=lon_0,x_0=x_0,y_0=y_0,proj4=\
+    x_0 = x_0 if x_0!=None else self.parameters['false_easting']
+    y_0 = y_0 if y_0!=None else self.parameters['false_northing']
+    self.parameters = dict(ellps='WGS84',k_0=k_0,lat_0=lat_0,lon_0=lon_0,false_easting=x_0,false_northing=y_0,proj4=\
     f"+proj=tmerc +ellps=WGS84 +k_0={k_0} +lat_0={lat_0} +lon_0={lon_0} +x_0={x_0} +y_0={y_0}")
     self.latlon_to_xy_transform = Transformer.from_crs(self.crs_latlon,self.parameters['proj4'])
     self.xy_to_latlon_transform = Transformer.from_crs(self.parameters['proj4'],self.crs_latlon)
