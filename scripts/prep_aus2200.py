@@ -121,6 +121,7 @@ def prep_aus2200(input,grid):
     data['vstar'] = data['vstar'].isel(z=0,drop=True)
     data['zi'] = data['zi'].isel(z=0,drop=True).mean(dim=['x','y'])
     data['wthls'] = data['wthls'].isel(z=0,drop=True)
+  if(input['lsave_source']): data.to_netcdf(f"{input['outpath']}aus2200.nc")
   return data,transform
   # Read orography data
   # with xr.open_dataset(input['fileOrog']) as ds:
@@ -359,8 +360,8 @@ def wgs84_to_utm(var,dx,dy,xsize,ysize,transform,byChunks=False):
   var.y.attrs['standard_name']='projection_y_coordinate'
   var.y.attrs['long_name'] =f"Y Coordinate Of Projection"
   # Find rectangular grid
-  x_int = np.arange(0,xsize+2*dx,dx)
-  y_int = np.arange(0,ysize+2*dy,dy)
+  x_int = np.arange(0,xsize+2*dx,dx,dtype=np.double)
+  y_int = np.arange(0,ysize+2*dy,dy,dtype=np.double)
   X_int,Y_int = np.meshgrid(x_int,y_int)
   # Find lat and lon for new variable
   newLat,newLon = transform.xy_to_latlon(X_int,Y_int)

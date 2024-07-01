@@ -1,6 +1,7 @@
 { "author": "Frans Liqui Lung",
   "coarse": {
      "source": "AUS2200",
+     "lsave_source": false,
      "inpath":"/g/data/hh5/tmp/AUS2200/flood22-continuous/netcdf/",
      "outpath":"/home/565/fl2086/dales_openBC_setup/simulations/aus2200/test/",
      "start":"2022-02-25T00:00",
