@@ -10,6 +10,7 @@ def synthetic_turbulence(input,grid,data,transform):
   # Get velocity variances from TKE assuming isotropic turbulence
   tke_prof = data['tke'].sel(x=slice(0,grid.xsize),y=slice(0,grid.ysize)).mean(dim=['x','y']).interp(z=grid.zt, assume_sorted=True).rename({'z': 'zt'})
   e  = 2/3*tke_prof
+  e  = xr.where(np.isnan(e),0.,e)
   u2 = e.rename('u2').expand_dims(dim={'ypatch': [grid.ysize/2], 'xpatch': [grid.xsize/2]},axis=[2,3])
   v2 = e.rename('v2').expand_dims(dim={'ypatch': [grid.ysize/2], 'xpatch': [grid.xsize/2]},axis=[2,3])
   w2 = e.rename('w2').expand_dims(dim={'ypatch': [grid.ysize/2], 'xpatch': [grid.xsize/2]},axis=[2,3])
@@ -35,13 +36,14 @@ def synthetic_turbulence(input,grid,data,transform):
   uv     = xr.where(np.isnan(uv),0.,uv)
   # Get wthls
   wthls = data['wthls'].sel(x=slice(0,grid.xsize),y=slice(0,grid.ysize)).mean(dim=['x','y'])
+  wthls = xr.where(wthls<0,0.,wthls)
   wthl  = xr.where(mask,wthls*(1-1.2*u2.coords['zt']/zi),0.).rename('wthl')\
     .transpose('time','zt')\
     .expand_dims(dim={'ypatch': [grid.ysize/2], 'xpatch': [grid.xsize/2]},axis=[2,3])\
     .chunk({'time': input['tchunk']})
   # Get thl2
   wstar = (grav/T0*wthls*zi)**(1/3)
-  Tstar = wthls/wstar
+  Tstar = xr.where(wthls==0.,0.,wthls/wstar)
   thl2  = xr.where(mask,( Tstar*(u2.coords['zt']/zi)**(-1/3) )**2*np.minimum(u2.coords['zt']/u2.coords['zt'][3],1), 0.)\
     .rename('thl2')\
     .transpose('time','zt')\
