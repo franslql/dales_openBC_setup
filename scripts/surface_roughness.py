@@ -45,8 +45,8 @@ def surface_roughness(input,grid,data,transform):
   return z0
 
 def surface_roughness_fine(input,grid):
-  with xr.open_mfdataset(f"{input['inpath_coarse']}z0.inp.*.nc",chunks={"time": input['tchunk']}) as ds:
-    z0_fine = ds.sel(time=slice(input['start'], input['end'])).interp(xt=grid.xt+input['x_offset'],yt=grid.yt+input['y_offset'],assume_sorted=True)
+  with xr.open_mfdataset(f"{input['inpath_coarse']}z0.inp.*.nc") as ds:
+    z0_fine = ds.interp(xt=grid.xt+input['x_offset'],yt=grid.yt+input['y_offset'],assume_sorted=True)
     # Adjust transform
     z0_fine['transform'].attrs['false_easting'] = z0_fine['transform'].attrs['false_easting']-input['x_offset']
     z0_fine['transform'].attrs['false_northing'] = z0_fine['transform'].attrs['false_northing']-input['y_offset']
@@ -57,11 +57,8 @@ def surface_roughness_fine(input,grid):
       if 'y_0' in param: line = f"+y_0={z0_fine['transform'].attrs['false_northing']} "
       proj4 = proj4+line
     z0_fine['transform'].attrs['proj4']=proj4.rstrip()
-    # Set time information
-    ts = z0_fine['time'].values.astype('datetime64[s]')
-    dts = (ts-np.datetime64(input['time0'],'s'))/np.timedelta64(1, 's')
     # Set coordinates
-    z0_fine = z0_fine.assign_coords({'time': dts, 'xt':grid.xt,'yt':grid.yt})
+    z0_fine = z0_fine.assign_coords({'xt':grid.xt,'yt':grid.yt})
     # Add global attributes
     z0_fine = z0_fine.assign_attrs({'title': f"z0.inp.{input['iexpnr']:03d}.nc",
                                           'history': f"Created on {datetime.now(tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC",

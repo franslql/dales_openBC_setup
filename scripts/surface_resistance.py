@@ -45,8 +45,8 @@ def surface_resistance(input,grid,data,transform):
   return rs
 
 def surface_resistance_fine(input,grid):
-  with xr.open_mfdataset(f"{input['inpath_coarse']}rs.inp.*.nc",chunks={"time": input['tchunk']}) as ds:
-    rs_fine = ds.sel(time=slice(input['start'], input['end'])).interp(xt=grid.xt+input['x_offset'],yt=grid.yt+input['y_offset'],assume_sorted=True)
+  with xr.open_mfdataset(f"{input['inpath_coarse']}rs.inp.*.nc") as ds:
+    rs_fine = ds.interp(xt=grid.xt+input['x_offset'],yt=grid.yt+input['y_offset'],assume_sorted=True)
     # Adjust transform
     rs_fine['transform'].attrs['false_easting'] = rs_fine['transform'].attrs['false_easting']-input['x_offset']
     rs_fine['transform'].attrs['false_northing'] = rs_fine['transform'].attrs['false_northing']-input['y_offset']
@@ -57,11 +57,8 @@ def surface_resistance_fine(input,grid):
       if 'y_0' in param: line = f"+y_0={rs_fine['transform'].attrs['false_northing']} "
       proj4 = proj4+line
     rs_fine['transform'].attrs['proj4']=proj4.rstrip()
-    # Set time information
-    ts = rs_fine['time'].values.astype('datetime64[s]')
-    dts = (ts-np.datetime64(input['time0'],'s'))/np.timedelta64(1, 's')
     # Set coordinates
-    rs_fine = rs_fine.assign_coords({'time': dts, 'xt':grid.xt,'yt':grid.yt})
+    rs_fine = rs_fine.assign_coords({'xt':grid.xt,'yt':grid.yt})
     # Add global attributes
     rs_fine = rs_fine.assign_attrs({'title': f"rs.inp.{input['iexpnr']:03d}.nc",
                                           'history': f"Created on {datetime.now(tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC",
