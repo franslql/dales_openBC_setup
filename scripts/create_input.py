@@ -82,7 +82,7 @@ if('fine' in input):
     z0 = surface_roughness_fine(input_fine,grid)
     print('finished surface roughness')
   #%% Create heterogeneous surface resistance > rs.inp.xxx.nc
-  if('rs' in input_coarse):
+  if('rs' in input_fine):
     rs = surface_resistance_fine(input_fine,grid)
     print('finished surface resistance') 
 # %%
