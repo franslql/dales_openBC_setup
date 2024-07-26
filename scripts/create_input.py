@@ -25,10 +25,6 @@ if 'coarse' in input:
   if(input_coarse['source'].lower() == 'harmonie'):
     data,transform = prep_harmonie(input_coarse,grid)
   elif(input_coarse['source'].lower() == 'aus2200'):
-    # import importlib
-    # import prep_aus2200
-    # importlib.reload(prep_aus2200)
-    # from prep_aus2200 import prep_aus2200
     data,transform = prep_aus2200(input_coarse,grid)
   else:
     print('unvalid source type')
