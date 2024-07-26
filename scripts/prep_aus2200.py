@@ -29,8 +29,8 @@ def prep_aus2200(input,grid):
                         [input['lat_sw'],input['lat_sw']+grid.ysize/100000])
   x_sw,y_sw = transform.latlon_to_xy(input['lat_sw'],input['lon_sw'])
   # Translate to make southwest corner of DALES origin
-  transform.update_parameters(x_0=transform.parameters['x_0']-x_sw,\
-                              y_0=transform.parameters['y_0']-y_sw)
+  transform.update_parameters(false_easting=transform.parameters['false_easting']-x_sw,\
+                              false_northing=transform.parameters['false_northing']-y_sw)
   x_sw,y_sw = transform.latlon_to_xy(input['lat_sw'],input['lon_sw'])
   # Get domain box in WGS84
   lat_ne,lon_ne = transform.xy_to_latlon(grid.xsize,grid.ysize)
@@ -511,18 +511,18 @@ class Transform:
     k_0 = float(wkt.split('\"Scale factor at natural origin\",')[-1].split(',')[0])
     lat_0 = float(wkt.split('\"Latitude of natural origin\",')[-1].split(',')[0])
     lon_0 = float(wkt.split('\"Longitude of natural origin\",')[-1].split(',')[0])
-    x_0 = float(wkt.split('\"False easting\",')[-1].split(',')[0])
-    y_0 = float(wkt.split('\"False northing\",')[-1].split(',')[0])
-    self.update_parameters(k_0=k_0,lat_0=lat_0,lon_0=lon_0,x_0=x_0,y_0=y_0)
+    false_easting = float(wkt.split('\"False easting\",')[-1].split(',')[0])
+    false_northing = float(wkt.split('\"False northing\",')[-1].split(',')[0])
+    self.update_parameters(k_0=k_0,lat_0=lat_0,lon_0=lon_0,false_easting=false_easting,false_northing=false_northing)
 
-  def update_parameters(self,k_0=None,lat_0=None,lon_0=None,x_0=None,y_0=None):
-    k_0 = k_0 if k_0!=None else self.parameters['k_0']
-    lat_0 = lat_0 if lat_0!=None else self.parameters['lat_0']
-    lon_0 = lon_0 if lon_0!=None else self.parameters['lon_0']
-    x_0 = x_0 if x_0!=None else self.parameters['x_0']
-    y_0 = y_0 if y_0!=None else self.parameters['y_0']
-    self.parameters = dict(ellps='WGS84',k_0=k_0,lat_0=lat_0,lon_0=lon_0,x_0=x_0,y_0=y_0,proj4=\
-    f"+proj=tmerc +ellps=WGS84 +k_0={k_0} +lat_0={lat_0} +lon_0={lon_0} +x_0={x_0} +y_0={y_0}")
+  def update_parameters(self,k_0=None,lat_0=None,lon_0=None,false_easting=None,false_northing=None):
+    if k_0 == None: k_0 = self.parameters['k_0']
+    if lat_0 == None: lat_0 = self.parameters['lat_0']
+    if lon_0 == None: lon_0 = self.parameters['lon_0']
+    if false_easting == None : false_easting = self.parameters['false_easting']
+    if false_northing == None : false_northing = self.parameters['false_norhting']
+    self.parameters = dict(ellps='WGS84',k_0=k_0,lat_0=lat_0,lon_0=lon_0,false_easting=false_easting,false_northing=false_northing,proj4=\
+    f"+proj=tmerc +ellps=WGS84 +k_0={k_0} +lat_0={lat_0} +lon_0={lon_0} +x_0={false_easting} +y_0={false_northing}")
     self.latlon_to_xy_transform = Transformer.from_crs(self.crs_latlon,self.parameters['proj4'])
     self.xy_to_latlon_transform = Transformer.from_crs(self.parameters['proj4'],self.crs_latlon)
 
