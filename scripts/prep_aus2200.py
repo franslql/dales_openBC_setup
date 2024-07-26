@@ -13,6 +13,7 @@ from pyproj.database import query_utm_crs_info
 import dask.array as da
 import dask.delayed as ddelay
 from numba import jit
+import sys
 # Constants
 # Simulation constants (modglobal)
 p0   = 1e5          # Reference pressure
@@ -50,6 +51,7 @@ def prep_aus2200(input,grid):
   varNames = ['u','v','w','thl','qt']
   varCodes_surf = ['fld_s16i222','fld_s03i236','fld_s03i237'] 
   varNames_surf = ['ps','Ts','qt']
+  varCode_mask  = 'fld_s00i030'
   if('synturb' in input):
     varCodes   = varCodes+['fld_s03i473']
     varNames  = varNames+['tke']
@@ -57,8 +59,16 @@ def prep_aus2200(input,grid):
     varNames_surf = varNames_surf+['zi','ustar','vstar','wthls']
   def read_variables(filenames,varCodes,varNames,transform,lsurf=False):
     data = []
+    mask = []
     for filename in filenames:
       with xr.open_dataset(filename) as ds:
+        if(len(mask)==0 and lsurf):
+          mask = ds[varCode_mask].squeeze(drop=True)
+          dims = mask.dims
+          mask = mask.sel({dims[-2]:slice(lat_min-buffer,lat_max+buffer),\
+                         dims[-1]:slice(lon_min-buffer,lon_max+buffer)})
+          mask = mask.rename('land_mask')
+          mask = wgs84_to_utm(mask,2200,2200,grid.xsize,grid.ysize,transform,byChunks=False).round()
         ds = ds.sel(time=slice(input['start'],input['end']))
         if(len(ds['time'])<1): continue
         ds_new = []
@@ -83,15 +93,15 @@ def prep_aus2200(input,grid):
         ds_new = xr.merge(ds_new)
       data.append(ds_new)
     data = xr.concat(data[:],'time')
-    return data
+    return data,mask
   def get_ncName(filename):
     return filename.split('/')[-1]
   filenames = glob.glob(input['inpath']+"*/aus2200/d0198/RA3/um/umnsa_mdl_*.nc")
   filenames.sort(key=get_ncName)
-  data = read_variables(filenames,varCodes,varNames,transform,lsurf=False)
+  data,_ = read_variables(filenames,varCodes,varNames,transform,lsurf=False)
   filenames = glob.glob(input['inpath']+"*/aus2200/d0198/RA3/um/umnsa_slv_*.nc")
   filenames.sort(key=get_ncName)
-  datas = read_variables(filenames,varCodes_surf,varNames_surf,transform,lsurf=True)
+  datas,mask = read_variables(filenames,varCodes_surf,varNames_surf,transform,lsurf=True)
   datas = datas.assign({'transform' : xr.DataArray([],name='Transverse_Mercator',attrs=transform.parameters)})
   datas = datas.assign({'u' : xr.zeros_like(datas.qt),
                         'v' : xr.zeros_like(datas.qt),
@@ -121,6 +131,7 @@ def prep_aus2200(input,grid):
     data['vstar'] = data['vstar'].isel(z=0,drop=True)
     data['zi'] = data['zi'].isel(z=0,drop=True).mean(dim=['x','y'])
     data['wthls'] = data['wthls'].isel(z=0,drop=True)
+  data = data.assign({'land_mask':mask})
   if(input['lsave_source']): data.to_netcdf(f"{input['outpath']}aus2200.nc")
   return data,transform
   # Read orography data
@@ -366,7 +377,16 @@ def wgs84_to_utm(var,dx,dy,xsize,ysize,transform,byChunks=False):
   # Find lat and lon for new variable
   newLat,newLon = transform.xy_to_latlon(X_int,Y_int)
   # Set dimensions and coordinates new variable
-  if(len(var.shape)==3): # Surface variable
+  Ndims = len(var.shape)
+  if(Ndims==2): # land_mask or orography
+    newCoords = {'y'   :y_int,
+                  'x'   :x_int,
+                  'lat' :(["y", "x"], newLat),
+                  'lon' :(["y", "x"], newLon)
+    }
+    newDims = ['y','x']
+    newShape = [len(y_int),len(x_int)]
+  elif(Ndims==3): # Surface variable
     newCoords = {'time' :var.coords['time'],
                   'y'   :y_int,
                   'x'   :x_int,
@@ -375,8 +395,8 @@ def wgs84_to_utm(var,dx,dy,xsize,ysize,transform,byChunks=False):
     }
     newDims = ['time','y','x']
     newShape = [len(var.time),len(y_int),len(x_int)]
-    lsurf = True
-  else: # 3D variable
+
+  elif(Ndims==4): # 3D variable
     newCoords = {'time' :var.coords['time'],
                 'z'     :var.coords['z'],
                 'y'     :y_int,
@@ -386,22 +406,33 @@ def wgs84_to_utm(var,dx,dy,xsize,ysize,transform,byChunks=False):
     }
     newDims = ['time','z','y','x']
     newShape = [len(var.time),len(var.z),len(y_int),len(x_int)]
-    lsurf = False
+  else:
+    sys.exit('Unvalid dimensions for interpolation')
   # Preallocate variables
   varInt = []
   ts = 0
-  # Take time chunk size into account
-  tInd = var.get_axis_num('time')
-  if byChunks:
-    tchunks = var.chunks[tInd]
-    tlen = len(tchunks)
-  else:
-    tlen = var.time.shape[0]
-    tchunks = np.ones((tlen,))
+  if(Ndims>2):
+    # Take time chunk size into account
+    tInd = var.get_axis_num('time')
+    if byChunks:
+      tchunks = var.chunks[tInd]
+      tlen = len(tchunks)
+    else:
+      tlen = var.time.shape[0]
+      tchunks = np.ones((tlen,))
   # Do interpolation
-  def interpolation(var,xint,yint,ts,te,lsurf=False):
+  def interpolation(var,xint,yint,ts,te):
     from scipy import interpolate
-    if(lsurf): # Surface variable
+    Ndims = len(var.shape)
+    if(Ndims==2): # land mask or orography
+      varOut =  np.reshape(
+        interpolate.griddata( 
+        (var.x.values.flatten(),var.y.values.flatten()), 
+        var.values.flatten(), 
+        (xint.flatten(),yint.flatten()) 
+        ),
+      np.shape(xint))
+    elif(Ndims==3): # Surface variable
       varOut = []
       for it in np.arange(ts,te):
         varOut.append( np.reshape(
@@ -412,7 +443,7 @@ def wgs84_to_utm(var,dx,dy,xsize,ysize,transform,byChunks=False):
           ),
         np.shape(xint)) )
       varOut = np.stack(varOut[:],axis=0)
-    else: # 3D variable
+    elif(Ndims==4): # 3D variable
       varOut = []
       for it in np.arange(ts,te):
         varTmp = []
@@ -428,15 +459,20 @@ def wgs84_to_utm(var,dx,dy,xsize,ysize,transform,byChunks=False):
           )
         varOut.append(np.stack(varTmp[:],axis=0))
       varOut = np.stack(varOut[:],axis=0)
+    else:
+      sys.exit('Invalid number of dimensions for interpolation')
     return varOut
-  for it in range(tlen): # Interpolation per time step
-    te = ts + int(tchunks[it])
-    varInt.append(
-      ddelay(interpolation)(var,X_int,Y_int,ts,te,lsurf=lsurf)
-    )
-    ts = te
+  if Ndims == 2: # No time dimension
+    varInt = ddelay(interpolation)(var,X_int,Y_int,0,0)
+  else:
+    for it in range(tlen): # Interpolation per time step
+      te = ts + int(tchunks[it])
+      varInt.append(
+        ddelay(interpolation)(var,X_int,Y_int,ts,te)
+      )
+      ts = te
+    varInt = ddelay(np.concatenate)(varInt[:],axis=0)
   # Convert to xarray
-  varInt = ddelay(np.concatenate)(varInt[:],axis=0)
   varInt = xr.DataArray(
     da.from_delayed(varInt,newShape,dtype=float),
     coords = newCoords,
@@ -444,6 +480,7 @@ def wgs84_to_utm(var,dx,dy,xsize,ysize,transform,byChunks=False):
     name   = var.name,
     attrs  = var.attrs
   )
+  
   varInt.lat.attrs = var.lat.attrs
   varInt.lon.attrs = var.lon.attrs
   varInt.x.attrs['axis']='X'

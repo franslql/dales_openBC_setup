@@ -7,6 +7,8 @@ from initial_fields import initial_fields, initial_fields_fine
 from boundary_fields import boundary_fields, boundary_fields_fine
 from profiles import profiles
 from surface_temperature import surface_temperature, surface_temperature_fine
+from surface_roughness import surface_roughness, surface_roughness_fine
+from surface_resistance import surface_resistance, surface_resistance_fine
 from synthetic_turbulence import synthetic_turbulence
 from gaussian_filter import gaussian_filter
 import sys
@@ -54,7 +56,14 @@ if 'coarse' in input:
   if('tskin' in input_coarse): 
     tskin = surface_temperature(input_coarse,grid,data,transform)
     print('finished surface temperature')
-
+  #%% Create heterogeneous surface roughness > z0.inp.xxx.nc
+  if('z0' in input_coarse):
+    z0 = surface_roughness(input_coarse,grid,data,transform)
+    print('finished surface roughness')
+  #%% Create heterogeneous surface resistance > rs.inp.xxx.nc
+  if('rs' in input_coarse):
+    rs = surface_resistance(input_coarse,grid,data,transform)
+    print('finished surface resistance') 
 #%% Write data to input files
 if('fine' in input):
   input_fine = input['fine']
@@ -72,4 +81,12 @@ if('fine' in input):
   if('tskin' in input_fine):
     tskin_fine = surface_temperature_fine(input_fine,grid)
     print('finished surface temperature')
+  #%% Create heterogeneous surface roughness > z0.inp.xxx.nc
+  if('z0' in input_fine):
+    z0 = surface_roughness_fine(input_fine,grid)
+    print('finished surface roughness')
+  #%% Create heterogeneous surface resistance > rs.inp.xxx.nc
+  if('rs' in input_coarse):
+    rs = surface_resistance_fine(input_fine,grid)
+    print('finished surface resistance') 
 # %%
