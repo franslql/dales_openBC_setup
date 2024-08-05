@@ -46,11 +46,13 @@ def prep_aus2200(input,grid):
   # variables3D   = ['ua','va','wa','ta','hus','clw']
   # variablesSurf = ['ps','tas','huss']
   # Get model level files
-  varCodes = ['fld_s00i002','fld_s00i003','fld_s00i150','fld_s00i004','fld_s00i010']
+  varCodes = ['fld_s00i002','fld_s00i003','fld_s00i150','fld_s00i004','fld_s00i010','fld_s00i408','fld_s16i004']
   # varNames = ['u','v','w','theta','qv']
-  varNames = ['u','v','w','thl','qt']
+  varNames = ['u','v','w','th','qv','p','ta']
   varCodes_surf = ['fld_s16i222','fld_s03i236','fld_s03i237'] 
   varNames_surf = ['ps','Ts','qt']
+  varCodes_cld = ['fld_s00i254']
+  varNames_cld = ['ql']
   varCode_mask  = 'fld_s00i030'
   if('synturb' in input):
     varCodes   = varCodes+['fld_s03i473']
@@ -96,9 +98,15 @@ def prep_aus2200(input,grid):
     return data,mask
   def get_ncName(filename):
     return filename.split('/')[-1]
+  # Read model level data
   filenames = glob.glob(input['inpath']+"*/aus2200/d0198/RA3/um/umnsa_mdl_*.nc")
   filenames.sort(key=get_ncName)
   data,_ = read_variables(filenames,varCodes,varNames,transform,lsurf=False)
+  # Read cloud data
+  filenames = glob.glob(input['inpath']+"*/aus2200/d0198/RA3/um/umnsa_cldrad_*.nc")
+  filenames.sort(key=get_ncName)
+  data_cld,_ = read_variables(filenames,varCodes_cld,varNames_cld,transform,lsurf=False)
+  # Read surface data
   filenames = glob.glob(input['inpath']+"*/aus2200/d0198/RA3/um/umnsa_slv_*.nc")
   filenames.sort(key=get_ncName)
   datas,mask = read_variables(filenames,varCodes_surf,varNames_surf,transform,lsurf=True)
@@ -107,17 +115,44 @@ def prep_aus2200(input,grid):
                         'v' : xr.zeros_like(datas.qt),
                         'w' : xr.zeros_like(datas.qt)})
   datas = datas.expand_dims({'z': np.array([0.])},axis=1)
-  # Calculate surface thl
-  tas_exnr = datas['Ts'].isel({'time': 0},drop=True).sel(x=slice(0,grid.xsize),y=slice(0,grid.ysize)).mean(dim=['x','y']).values
-  ps_exnr  = datas['ps'].isel({'time': 0},drop=True).sel(x=slice(0,grid.xsize),y=slice(0,grid.ysize)).mean(dim=['x','y']).values
-  exnrs    = (ps_exnr/p0)**(Rd/cp)
-  thls_exnr= tas_exnr/exnrs
-  exnr     = xr.DataArray(exnrs,
+  # Get qt
+  qt = (data['qv']+data_cld['ql']).rename('qt')
+  data = data.assign({'qt':qt})
+  # Calculate exnr function and surface thl if first simulation, otherwise load exnr.inp.xxx
+  if(input['time0']==input['start']): # Calculate exnr function
+    tas_exnr = datas['Ts'].isel({'time': 0},drop=True).sel(x=slice(0,grid.xsize),y=slice(0,grid.ysize)).mean(dim=['x','y']).values
+    ps_exnr  = datas['ps'].isel({'time': 0},drop=True).sel(x=slice(0,grid.xsize),y=slice(0,grid.ysize)).mean(dim=['x','y']).values
+    exnrs    = (ps_exnr/p0)**(Rd/cp)
+    thls_exnr= tas_exnr/exnrs
+    rhobf    = calcBaseprof(data['z'].values,thls_exnr,ps_exnr,pref0=p0)
+    p_exnr   = rhobf*Rd*data['ta'][0,:].sel(x=slice(0,grid.xsize),y=slice(0,grid.ysize)).mean(dim=['x','y']).values*\
+           ( 1+(Rv/Rd-1)*data['qt'][0,:].sel(x=slice(0,grid.xsize),y=slice(0,grid.ysize)).mean(dim=['x','y']).values-\
+             Rv/Rd*data_cld['ql'][0,:].sel(x=slice(0,grid.xsize),y=slice(0,grid.ysize)).mean(dim=['x','y']).values ) # Ideal gas law
+    exnr     = (p_exnr/p0)**(Rd/cp)
+  else: # Read exnr function
+    f = open(input['exnr_file'],'r')
+    line0 = f.readline()
+    f.close()
+    thls_exnr = float(line0.split(',')[1].split('thls = ')[-1])
+    ps_exnr = float(line0.split(',')[2].split('ps = ')[-1])
+    exnr = np.loadtxt(input['exnr_file'],skiprows=2)
+    exnrs = exnr[0,1]
+    exnr = exnr[1:,1]
+  exnr     = xr.DataArray(exnr,
+                          dims = ['z'],
+                          coords={'z': data['z']},
+                          name = 'exnr',
+                          attrs = {'thls': thls_exnr, 'ps': ps_exnr})
+  data     = data.assign({'exnr': exnr})
+  datas    = datas.assign({'exnr': xr.DataArray(exnrs,
                           dims = ['z'],
                           coords={'z': [0.]},
                           name = 'exnr',
-                          attrs = {'thls': thls_exnr, 'ps': ps_exnr})
-  datas    = datas.assign({'thl':datas.Ts/exnrs, 'exnr':exnr})
+                          attrs = {'thls': thls_exnr, 'ps': ps_exnr})})
+  # Get thl
+  thl = (data['ta']/data['exnr']-Lv*data_cld['ql']/(cp*data['exnr'])).rename('thl')
+  data = data.assign({'thl':thl}).drop_vars(['th','qv','ta','p'])
+  datas    = datas.assign({'thl':datas.Ts/exnrs})
   datas = datas.drop(labels=['ps','Ts'])
   if('synturb' in input): 
     rhobf    = calcBaseprof(data.z.values,thls_exnr,ps_exnr,pref0=p0)
