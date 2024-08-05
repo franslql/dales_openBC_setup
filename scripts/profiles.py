@@ -32,7 +32,8 @@ def profiles(input,grid,initfields,data):
   # Open exnr.inp.xxx (if used)
   if('exnr' in data):
     exnr = open(f"{input['outpath']}exnr.inp.{input['iexpnr']:03}", 'w')
-    exnr.write(f"# Exnr function used, thls = {data['exnr'].attrs['thls']}, ps = {data['exnr'].attrs['ps']} created by {input['author']} at {time}\n")
+    exnr.write(f"# Exnr function used, thls = {data['exnr'].attrs['thls'][0]}, ps = {data['exnr'].attrs['ps'][0]}, created by {input['author']} at {time}\n")
+    exnr.write(f"# z exnr\n")
     for i in range(data.sizes['z']):
       exnr.write(f"{data['z'][i].values} {data['exnr'][i].values} \n")
     exnr.close()
