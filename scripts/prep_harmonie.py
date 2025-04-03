@@ -83,6 +83,15 @@ def prep_harmonie(input,grid):
                 .expand_dims({'lev':[data.sizes['lev']+1]},axis=1)],dim='lev')
                 .chunk({'lev': data.sizes['lev']+1}) 
      for var in variables] )
+  # Calculate backrad profiles for backrad.inp.iexpnr.nc
+  if('backrad' in input):
+     backrad = data[['hus','ta','p','lev']].sel(x=slice(0,grid.xsize),y=slice(0,grid.ysize)).mean(dim=['x','y','time']).reset_coords('height', drop=True)
+     backrad = backrad.swap_dims({"lev": "p"})
+     backrad = backrad.drop('lev')
+     backrad = backrad.rename_vars({'hus':'q','ta':'T'})
+     backrad = backrad.rename({'p':'lev'})
+     backrad = backrad.reindex(lev=backrad.lev[::-1])
+     backrad.to_netcdf(path=f"{input['outpath']}backrad.inp.{input['iexpnr']:03d}.nc", mode='w', format="NETCDF4")
   # Calculate 3D height levels
   rho = data['p']/(Rd*data['ta']*(1+(Rv/Rd-1)*(data['hus']+data['clw'])-Rv/Rd*data['clw']))
   rhoh= 0.5*(rho.assign_coords({'lev': rho['lev'].values-1})+rho)

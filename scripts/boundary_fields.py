@@ -175,10 +175,10 @@ def boundary_fields_fine(input,grid):
       e12west0 = ds['e120yz'].isel(time=-1,drop=True).interp(yt=grid.yt+input['y_offset']).rename('e12west').assign_coords(yt=grid.yt,zt=grid.zt).expand_dims({'time':[pd.Timestamp(input['start'])]},axis=0)
     if(input['nsv']>0):
       svwest0 =[]
-      with xr.open_mfdataset(f"{path}nryz*",chunks={"time": input['tchunk']}) as ds:  
-        svwest0.append(ds[f"nryz"].isel(time=-1,drop=True).interp(yt=grid.yt+input['y_offset']).rename('svwest').assign_coords(yt=grid.yt,zt=grid.zt).expand_dims({'isv':[1],'time':[pd.Timestamp(input['start'])]},axis=[0,1]))
-      with xr.open_mfdataset(f"{path}qryz*",chunks={"time": input['tchunk']}) as ds:  
-        svwest0.append(ds[f"qryz"].isel(time=-1,drop=True).interp(yt=grid.yt+input['y_offset']).rename('svwest').assign_coords(yt=grid.yt,zt=grid.zt).expand_dims({'isv':[2],'time':[pd.Timestamp(input['start'])]},axis=[0,1]))
+      with xr.open_mfdataset(f"{path}nr*",chunks={"time": input['tchunk']}) as ds:  
+        svwest0.append(ds[f"nr"].isel(time=-1,drop=True).interp(yt=grid.yt+input['y_offset']).rename('svwest').assign_coords(yt=grid.yt,zt=grid.zt).expand_dims({'isv':[1],'time':[pd.Timestamp(input['start'])]},axis=[0,1]))
+      with xr.open_mfdataset(f"{path}qr*",chunks={"time": input['tchunk']}) as ds:  
+        svwest0.append(ds[f"qr"].isel(time=-1,drop=True).interp(yt=grid.yt+input['y_offset']).rename('svwest').assign_coords(yt=grid.yt,zt=grid.zt).expand_dims({'isv':[2],'time':[pd.Timestamp(input['start'])]},axis=[0,1]))
       svwest0 = xr.concat(svwest0,'isv')
     # east boundary
     path = f"{input['outpath_coarse_old']}crossyz/{ix_east+2:04d}/"
@@ -196,10 +196,10 @@ def boundary_fields_fine(input,grid):
       e12east0 = ds['e120yz'].isel(time=-1,drop=True).interp(yt=grid.yt+input['y_offset']).rename('e12east').assign_coords(yt=grid.yt,zt=grid.zt).expand_dims({'time':[pd.Timestamp(input['start'])]},axis=0)
     if(input['nsv']>0):
       sveast0 =[]
-      with xr.open_mfdataset(f"{path}nryz*",chunks={"time": input['tchunk']}) as ds:  
-        sveast0.append(ds[f"nryz"].isel(time=-1,drop=True).interp(yt=grid.yt+input['y_offset']).rename('sveast').assign_coords(yt=grid.yt,zt=grid.zt).expand_dims({'isv':[1],'time':[pd.Timestamp(input['start'])]},axis=[0,1]))
-      with xr.open_mfdataset(f"{path}qryz*",chunks={"time": input['tchunk']}) as ds:  
-        sveast0.append(ds[f"qryz"].isel(time=-1,drop=True).interp(yt=grid.yt+input['y_offset']).rename('sveast').assign_coords(yt=grid.yt,zt=grid.zt).expand_dims({'isv':[2],'time':[pd.Timestamp(input['start'])]},axis=[0,1]))
+      with xr.open_mfdataset(f"{path}nr*",chunks={"time": input['tchunk']}) as ds:  
+        sveast0.append(ds[f"nr"].isel(time=-1,drop=True).interp(yt=grid.yt+input['y_offset']).rename('sveast').assign_coords(yt=grid.yt,zt=grid.zt).expand_dims({'isv':[1],'time':[pd.Timestamp(input['start'])]},axis=[0,1]))
+      with xr.open_mfdataset(f"{path}qr*",chunks={"time": input['tchunk']}) as ds:  
+        sveast0.append(ds[f"qr"].isel(time=-1,drop=True).interp(yt=grid.yt+input['y_offset']).rename('sveast').assign_coords(yt=grid.yt,zt=grid.zt).expand_dims({'isv':[2],'time':[pd.Timestamp(input['start'])]},axis=[0,1]))
       sveast0 = xr.concat(sveast0,'isv')
     # south boundary
     path = f"{input['outpath_coarse_old']}crossxz/{iy_south+2:04d}/"
@@ -217,10 +217,10 @@ def boundary_fields_fine(input,grid):
       e12south0 = ds['e120xz'].isel(time=-1,drop=True).interp(xt=grid.xt+input['x_offset']).rename('e12south').assign_coords(xt=grid.xt,zt=grid.zt).expand_dims({'time':[pd.Timestamp(input['start'])]},axis=0)
     if(input['nsv']>0):
       svsouth0 =[]
-      with xr.open_mfdataset(f"{path}nrxz*",chunks={"time": input['tchunk']}) as ds:  
-        svsouth0.append(ds[f"nrxz"].isel(time=-1,drop=True).interp(xt=grid.xt+input['x_offset']).rename('svsouth').assign_coords(xt=grid.xt,zt=grid.zt).expand_dims({'isv':[1],'time':[pd.Timestamp(input['start'])]},axis=[0,1]))
-      with xr.open_mfdataset(f"{path}qrxz*",chunks={"time": input['tchunk']}) as ds:  
-        svsouth0.append(ds[f"qrxz"].isel(time=-1,drop=True).interp(xt=grid.xt+input['x_offset']).rename('svsouth').assign_coords(xt=grid.xt,zt=grid.zt).expand_dims({'isv':[2],'time':[pd.Timestamp(input['start'])]},axis=[0,1]))
+      with xr.open_mfdataset(f"{path}nr*",chunks={"time": input['tchunk']}) as ds:  
+        svsouth0.append(ds[f"nr"].isel(time=-1,drop=True).interp(xt=grid.xt+input['x_offset']).rename('svsouth').assign_coords(xt=grid.xt,zt=grid.zt).expand_dims({'isv':[1],'time':[pd.Timestamp(input['start'])]},axis=[0,1]))
+      with xr.open_mfdataset(f"{path}qr*",chunks={"time": input['tchunk']}) as ds:  
+        svsouth0.append(ds[f"qr"].isel(time=-1,drop=True).interp(xt=grid.xt+input['x_offset']).rename('svsouth').assign_coords(xt=grid.xt,zt=grid.zt).expand_dims({'isv':[2],'time':[pd.Timestamp(input['start'])]},axis=[0,1]))
       svsouth0 = xr.concat(svsouth0,'isv')
     # north boundary
     path = f"{input['outpath_coarse_old']}crossxz/{iy_north+2:04d}/"
@@ -238,10 +238,10 @@ def boundary_fields_fine(input,grid):
       e12north0 = ds['e120xz'].isel(time=-1,drop=True).interp(xt=grid.xt+input['x_offset']).rename('e12north').assign_coords(xt=grid.xt,zt=grid.zt).expand_dims({'time':[pd.Timestamp(input['start'])]},axis=0)
     if(input['nsv']>0):
       svnorth0 =[]
-      with xr.open_mfdataset(f"{path}nrxz*",chunks={"time": input['tchunk']}) as ds:  
-        svnorth0.append(ds[f"nrxz"].isel(time=-1,drop=True).interp(xt=grid.xt+input['x_offset']).rename('svnorth').assign_coords(xt=grid.xt,zt=grid.zt).expand_dims({'isv':[1],'time':[pd.Timestamp(input['start'])]},axis=[0,1]))
-      with xr.open_mfdataset(f"{path}qrxz*",chunks={"time": input['tchunk']}) as ds:  
-        svnorth0.append(ds[f"qrxz"].isel(time=-1,drop=True).interp(xt=grid.xt+input['x_offset']).rename('svnorth').assign_coords(xt=grid.xt,zt=grid.zt).expand_dims({'isv':[2],'time':[pd.Timestamp(input['start'])]},axis=[0,1]))
+      with xr.open_mfdataset(f"{path}nr*",chunks={"time": input['tchunk']}) as ds:  
+        svnorth0.append(ds[f"nr"].isel(time=-1,drop=True).interp(xt=grid.xt+input['x_offset']).rename('svnorth').assign_coords(xt=grid.xt,zt=grid.zt).expand_dims({'isv':[1],'time':[pd.Timestamp(input['start'])]},axis=[0,1]))
+      with xr.open_mfdataset(f"{path}qr*",chunks={"time": input['tchunk']}) as ds:  
+        svnorth0.append(ds[f"qr"].isel(time=-1,drop=True).interp(xt=grid.xt+input['x_offset']).rename('svnorth').assign_coords(xt=grid.xt,zt=grid.zt).expand_dims({'isv':[2],'time':[pd.Timestamp(input['start'])]},axis=[0,1]))
       svnorth0 = xr.concat(svnorth0,'isv')
     # top boundary
     path = f"{input['outpath_coarse_old']}crossxy/{grid.kmax:04d}/"
@@ -259,10 +259,10 @@ def boundary_fields_fine(input,grid):
       e12top0 = ds['e120xy'].isel(time=-1,drop=True).interp(xt=grid.xt+input['x_offset'],yt=grid.yt+input['y_offset']).rename('e12top').assign_coords(xt=grid.xt,yt=grid.yt).expand_dims({'time':[pd.Timestamp(input['start'])]},axis=0)
     if(input['nsv']>0):
       svtop0 =[]
-      with xr.open_mfdataset(f"{path}nrxy*",chunks={"time": input['tchunk']}) as ds:  
-        svtop0.append(ds[f"nrxy"].isel(time=-1,drop=True).interp(xt=grid.xt+input['x_offset'],yt=grid.yt+input['y_offset']).rename('svtop').assign_coords(xt=grid.xt,yt=grid.yt).expand_dims({'isv':[1],'time':[pd.Timestamp(input['start'])]},axis=[0,1]))
-      with xr.open_mfdataset(f"{path}qrxy*",chunks={"time": input['tchunk']}) as ds:  
-        svtop0.append(ds[f"qrxy"].isel(time=-1,drop=True).interp(xt=grid.xt+input['x_offset'],yt=grid.yt+input['y_offset']).rename('svtop').assign_coords(xt=grid.xt,yt=grid.yt).expand_dims({'isv':[2],'time':[pd.Timestamp(input['start'])]},axis=[0,1]))
+      with xr.open_mfdataset(f"{path}nr*",chunks={"time": input['tchunk']}) as ds:  
+        svtop0.append(ds[f"nr"].isel(time=-1,drop=True).interp(xt=grid.xt+input['x_offset'],yt=grid.yt+input['y_offset']).rename('svtop').assign_coords(xt=grid.xt,yt=grid.yt).expand_dims({'isv':[1],'time':[pd.Timestamp(input['start'])]},axis=[0,1]))
+      with xr.open_mfdataset(f"{path}qr*",chunks={"time": input['tchunk']}) as ds:  
+        svtop0.append(ds[f"qr"].isel(time=-1,drop=True).interp(xt=grid.xt+input['x_offset'],yt=grid.yt+input['y_offset']).rename('svtop').assign_coords(xt=grid.xt,yt=grid.yt).expand_dims({'isv':[2],'time':[pd.Timestamp(input['start'])]},axis=[0,1]))
       svtop0 = xr.concat(svtop0,'isv')
   # Get later time steps from corresponding coarse simulation output
   # West boundary
@@ -287,10 +287,10 @@ def boundary_fields_fine(input,grid):
     e12west = xr.concat([e12west0,e12west],dim='time')
   if(input['nsv']>0):
     svwest =[]
-    with xr.open_mfdataset(f"{path}nryz*",chunks={"time": input['tchunk']}) as ds:
-      svwest.append(ds[f"nryz"].interp(yt=grid.yt+input['y_offset']).rename('svwest').assign_coords(yt=grid.yt,zt=grid.zt).expand_dims(dim={'isv':np.array([1])},axis=0))
-    with xr.open_mfdataset(f"{path}qryz*",chunks={"time": input['tchunk']}) as ds:
-      svwest.append(ds[f"qryz"].interp(yt=grid.yt+input['y_offset']).rename('svwest').assign_coords(yt=grid.yt,zt=grid.zt).expand_dims(dim={'isv':np.array([2])},axis=0))
+    with xr.open_mfdataset(f"{path}nr*",chunks={"time": input['tchunk']}) as ds:
+      svwest.append(ds[f"nr"].interp(yt=grid.yt+input['y_offset']).rename('svwest').assign_coords(yt=grid.yt,zt=grid.zt).expand_dims(dim={'isv':np.array([1])},axis=0))
+    with xr.open_mfdataset(f"{path}qr*",chunks={"time": input['tchunk']}) as ds:
+      svwest.append(ds[f"qr"].interp(yt=grid.yt+input['y_offset']).rename('svwest').assign_coords(yt=grid.yt,zt=grid.zt).expand_dims(dim={'isv':np.array([2])},axis=0))
     # for isv in range(input['nsv']):
     #   with xr.open_mfdataset(f"{path}sv{isv+1:03}*",chunks={"time": input['tchunk']}) as ds:
     #     svwest.append(ds[f"sv{isv+1:03}"].interp(yt=grid.yt+input['y_offset']).rename('svwest').assign_coords(yt=grid.yt,zt=grid.zt))
@@ -318,10 +318,10 @@ def boundary_fields_fine(input,grid):
     e12east = xr.concat([e12east0,e12east],dim='time')
   if(input['nsv']>0):
     sveast =[]
-    with xr.open_mfdataset(f"{path}nryz*",chunks={"time": input['tchunk']}) as ds:
-      sveast.append(ds[f"nryz"].interp(yt=grid.yt+input['y_offset']).rename('sveast').assign_coords(yt=grid.yt,zt=grid.zt).expand_dims(dim={'isv':np.array([1])},axis=0))
-    with xr.open_mfdataset(f"{path}qryz*",chunks={"time": input['tchunk']}) as ds:
-      sveast.append(ds[f"qryz"].interp(yt=grid.yt+input['y_offset']).rename('sveast').assign_coords(yt=grid.yt,zt=grid.zt).expand_dims(dim={'isv':np.array([2])},axis=0))
+    with xr.open_mfdataset(f"{path}nr*",chunks={"time": input['tchunk']}) as ds:
+      sveast.append(ds[f"nr"].interp(yt=grid.yt+input['y_offset']).rename('sveast').assign_coords(yt=grid.yt,zt=grid.zt).expand_dims(dim={'isv':np.array([1])},axis=0))
+    with xr.open_mfdataset(f"{path}qr*",chunks={"time": input['tchunk']}) as ds:
+      sveast.append(ds[f"qr"].interp(yt=grid.yt+input['y_offset']).rename('sveast').assign_coords(yt=grid.yt,zt=grid.zt).expand_dims(dim={'isv':np.array([2])},axis=0))
     # for isv in range(input['nsv']):
     #   with xr.open_mfdataset(f"{path}sv{isv+1:03}*",chunks={"time": input['tchunk']}) as ds:
     #     sveast.append(ds[f"sv{isv+1:03}"].interp(yt=grid.yt+input['y_offset']).rename('sveast').assign_coords(yt=grid.yt,zt=grid.zt))
@@ -349,10 +349,10 @@ def boundary_fields_fine(input,grid):
     e12south = xr.concat([e12south0,e12south],dim='time')
   if(input['nsv']>0):
     svsouth =[]
-    with xr.open_mfdataset(f"{path}nrxz*",chunks={"time": input['tchunk']}) as ds:
-        svsouth.append(ds[f"nrxz"].interp(xt=grid.xt+input['x_offset']).rename('svsouth').assign_coords(xt=grid.xt,zt=grid.zt).expand_dims(dim={'isv':np.array([1])},axis=0))
-    with xr.open_mfdataset(f"{path}qrxz*",chunks={"time": input['tchunk']}) as ds:
-        svsouth.append(ds[f"qrxz"].interp(xt=grid.xt+input['x_offset']).rename('svsouth').assign_coords(xt=grid.xt,zt=grid.zt).expand_dims(dim={'isv':np.array([2])},axis=0))
+    with xr.open_mfdataset(f"{path}nr*",chunks={"time": input['tchunk']}) as ds:
+        svsouth.append(ds[f"nr"].interp(xt=grid.xt+input['x_offset']).rename('svsouth').assign_coords(xt=grid.xt,zt=grid.zt).expand_dims(dim={'isv':np.array([1])},axis=0))
+    with xr.open_mfdataset(f"{path}qr*",chunks={"time": input['tchunk']}) as ds:
+        svsouth.append(ds[f"qr"].interp(xt=grid.xt+input['x_offset']).rename('svsouth').assign_coords(xt=grid.xt,zt=grid.zt).expand_dims(dim={'isv':np.array([2])},axis=0))
     # for isv in range(input['nsv']):
     #   with xr.open_mfdataset(f"{path}sv{isv+1:03}*",chunks={"time": input['tchunk']}) as ds:
     #     svsouth.append(ds[f"sv{isv+1:03}"].interp(xt=grid.xt+input['x_offset']).rename('svsouth').assign_coords(xt=grid.xt,zt=grid.zt))
@@ -380,10 +380,10 @@ def boundary_fields_fine(input,grid):
     e12north = xr.concat([e12north0,e12north],dim='time')
   if(input['nsv']>0):
     svnorth =[]
-    with xr.open_mfdataset(f"{path}nrxz*",chunks={"time": input['tchunk']}) as ds:
-        svnorth.append(ds[f"nrxz"].interp(xt=grid.xt+input['x_offset']).rename('svnorth').assign_coords(xt=grid.xt,zt=grid.zt).expand_dims(dim={'isv':np.array([1])},axis=0))
-    with xr.open_mfdataset(f"{path}qrxz*",chunks={"time": input['tchunk']}) as ds:
-        svnorth.append(ds[f"qrxz"].interp(xt=grid.xt+input['x_offset']).rename('svnorth').assign_coords(xt=grid.xt,zt=grid.zt).expand_dims(dim={'isv':np.array([2])},axis=0))
+    with xr.open_mfdataset(f"{path}nr*",chunks={"time": input['tchunk']}) as ds:
+        svnorth.append(ds[f"nr"].interp(xt=grid.xt+input['x_offset']).rename('svnorth').assign_coords(xt=grid.xt,zt=grid.zt).expand_dims(dim={'isv':np.array([1])},axis=0))
+    with xr.open_mfdataset(f"{path}qr*",chunks={"time": input['tchunk']}) as ds:
+        svnorth.append(ds[f"qr"].interp(xt=grid.xt+input['x_offset']).rename('svnorth').assign_coords(xt=grid.xt,zt=grid.zt).expand_dims(dim={'isv':np.array([2])},axis=0))
     # for isv in range(input['nsv']):
     #   with xr.open_mfdataset(f"{path}sv{isv+1:03}*",chunks={"time": input['tchunk']}) as ds:
     #     svnorth.append(ds[f"sv{isv+1:03}"].interp(xt=grid.xt+input['x_offset']).rename('svnorth').assign_coords(xt=grid.xt,zt=grid.zt))
@@ -411,10 +411,10 @@ def boundary_fields_fine(input,grid):
     e12top = xr.concat([e12top0,e12top],dim='time')
   if(input['nsv']>0):
     svtop =[]
-    with xr.open_mfdataset(f"{path}nrxy*",chunks={"time": input['tchunk']}) as ds:
-      svtop.append(ds[f"nrxy"].interp(xt=grid.xt+input['x_offset'],yt=grid.yt+input['y_offset']).rename('svtop').assign_coords(xt=grid.xt,yt=grid.yt).expand_dims(dim={'isv':np.array([1])},axis=0))
-    with xr.open_mfdataset(f"{path}qrxy*",chunks={"time": input['tchunk']}) as ds:
-      svtop.append(ds[f"qrxy"].interp(xt=grid.xt+input['x_offset'],yt=grid.yt+input['y_offset']).rename('svtop').assign_coords(xt=grid.xt,yt=grid.yt).expand_dims(dim={'isv':np.array([2])},axis=0))
+    with xr.open_mfdataset(f"{path}nr*",chunks={"time": input['tchunk']}) as ds:
+      svtop.append(ds[f"nr"].interp(xt=grid.xt+input['x_offset'],yt=grid.yt+input['y_offset']).rename('svtop').assign_coords(xt=grid.xt,yt=grid.yt).expand_dims(dim={'isv':np.array([1])},axis=0))
+    with xr.open_mfdataset(f"{path}qr*",chunks={"time": input['tchunk']}) as ds:
+      svtop.append(ds[f"qr"].interp(xt=grid.xt+input['x_offset'],yt=grid.yt+input['y_offset']).rename('svtop').assign_coords(xt=grid.xt,yt=grid.yt).expand_dims(dim={'isv':np.array([2])},axis=0))
     # for isv in range(input['nsv']):
     #   with xr.open_mfdataset(f"{path}sv{isv+1:03}*",chunks={"time": input['tchunk']}) as ds:
     #     svtop.append(ds[f"sv{isv+1:03}"].interp(xt=grid.xt+input['x_offset'],yt=grid.yt+input['y_offset']).rename('svtop').assign_coords(xt=grid.xt,yt=grid.yt))
